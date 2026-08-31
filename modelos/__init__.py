@@ -17,6 +17,7 @@ from modelos.notificacion import (
     NotificacionWalkover,
     NotificacionReciboPDF,
 )
+from modelos.huella import RegistroBiometrico, TIPOS_PERSONA
 
 __all__ = [
     "Usuario", "Administrador", "Jugador",
@@ -24,4 +25,5 @@ __all__ = [
     "Partido", "EventoPartido", "Gol", "Tarjeta", "CheckIn",
     "Notificacion", "NotificacionPagoCompletado", "NotificacionPagoPendiente",
     "NotificacionWalkover", "NotificacionReciboPDF",
+    "RegistroBiometrico", "TIPOS_PERSONA",
 ]

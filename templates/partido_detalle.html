@@ -164,8 +164,7 @@
                   <span class="badge text-bg-success">Confirmado</span>
                 {% elif es_admin and partido.estado == 'programado' %}
                   <button class="btn btn-sm btn-outline-success btn-checkin"
-                          data-jugador="{{ jugador.id }}"
-                          data-template="{{ jugador.codigo_huella or '' }}">
+                          data-jugador="{{ jugador.id }}">
                     Huella
                   </button>
                 {% else %}
@@ -434,13 +433,11 @@
 </script>
 
 {% if usuario.rol == 'admin' and partido.estado == 'programado' %}
-<script src="{{ url_for('static', filename='js/huella.js') }}"></script>
 <script>
-  const lector = new LectorHuella({
-    modo: "{{ modo_huella }}",
-    url: "{{ url_secugen }}",
-    umbral: {{ umbral_huella }}
-  });
+  {# La captura y el match ya los hace Flask del lado del servidor
+     (servicios/huella.py): el navegador solo pide el check-in y espera
+     la respuesta. Con el lector real la petición tarda unos segundos,
+     porque el servidor está esperando a que se apoye el dedo. #}
   const urlCheckin = "{{ url_for('checkin', partido_id=partido.id) }}";
   const modalCarnet = new bootstrap.Modal(document.getElementById("modal-carnet"));
 
@@ -449,14 +446,13 @@
       const jugadorId = boton.dataset.jugador;
       const textoOriginal = boton.textContent;
       boton.disabled = true;
-      boton.textContent = "Coloque el dedo...";
+      boton.textContent = "{% if modo_huella == 'secugen' %}Coloque el dedo…{% else %}Confirmando…{% endif %}";
 
       try {
-        const puntaje = await lector.verificar(boton.dataset.template);
         const respuesta = await fetch(urlCheckin, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jugador_id: jugadorId, puntaje: puntaje })
+          body: JSON.stringify({ jugador_id: jugadorId })
         });
         const datos = await respuesta.json();
         if (!datos.ok) throw new Error(datos.error);
@@ -466,7 +462,8 @@
         document.getElementById("carnet-equipo").textContent = datos.carnet.equipo;
         document.getElementById("carnet-cedula").textContent = datos.carnet.cedula;
         document.getElementById("carnet-hora").textContent = datos.carnet.hora;
-        document.getElementById("carnet-puntaje").textContent = datos.puntaje;
+        document.getElementById("carnet-puntaje").textContent =
+          datos.puntaje === null ? "— (modo simulado)" : datos.puntaje;
         modalCarnet.show();
 
         boton.outerHTML = '<span class="badge text-bg-success">Confirmado</span>';
