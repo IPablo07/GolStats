@@ -29,14 +29,14 @@
       {% if usuario.rol == 'admin' %}
       <div class="card-footer bg-white">
         <form method="post" id="form-huella"
-              action="{{ url_for('registrar_huella', jugador_id=jugador.id) }}">
-          <input type="hidden" name="template" id="template-huella">
+              action="{{ url_for('registrar_huella', tipo_persona='jugador', persona_id=jugador.id) }}">
           <button type="submit" class="btn btn-outline-success w-100" id="btn-enrolar">
             {% if tiene_huella %}Volver a registrar huella{% else %}Registrar huella{% endif %}
           </button>
         </form>
         <p class="small text-body-secondary mt-2 mb-0">
           Modo del lector: <strong>{{ modo_huella }}</strong>
+          {% if modo_huella == 'secugen' %}— coloque el dedo cuando el botón lo pida.{% endif %}
         </p>
       </div>
       {% endif %}
@@ -77,30 +77,14 @@
 
 {% block scripts %}
 {% if usuario.rol == 'admin' %}
-<script src="{{ url_for('static', filename='js/huella.js') }}"></script>
 <script>
-  const lector = new LectorHuella({
-    modo: "{{ modo_huella }}",
-    url: "{{ url_secugen }}",
-    umbral: {{ umbral_huella }}
-  });
-
-  document.getElementById("form-huella").addEventListener("submit", async (evento) => {
-    const campo = document.getElementById("template-huella");
-    if (campo.value) return;                 // ya se capturó, deja pasar el envío
-    evento.preventDefault();
-
+  {# La captura ahora la hace Flask del lado del servidor: el navegador
+     solo manda el formulario y espera la respuesta (unos segundos con
+     el lector real, al instante en modo simulado). #}
+  document.getElementById("form-huella").addEventListener("submit", () => {
     const boton = document.getElementById("btn-enrolar");
     boton.disabled = true;
-    boton.textContent = "Coloque el dedo en el lector...";
-    try {
-      campo.value = await lector.capturar();
-      evento.target.submit();
-    } catch (error) {
-      alert(error.message);
-      boton.disabled = false;
-      boton.textContent = "Registrar huella";
-    }
+    boton.textContent = "{% if modo_huella == 'secugen' %}Coloque el dedo en el lector…{% else %}Registrando…{% endif %}";
   });
 </script>
 {% endif %}

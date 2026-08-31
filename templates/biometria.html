@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "_macros.html" import badge_huella %}
+{% block titulo %}Huellas · GolStats{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h4 fw-bold mb-0">Huellas dactilares</h1>
+  <span class="badge text-bg-light">
+    Lector: <strong>{{ modo_huella }}</strong>
+    {% if modo_huella == 'secugen' %}(umbral {{ umbral_huella }}){% endif %}
+  </span>
+</div>
+
+<p class="text-body-secondary mb-4">
+  Cada vez que se registra una huella aquí se guarda —o se reemplaza, si ya
+  existía— una fila en PostgreSQL con la plantilla biométrica de esa
+  persona. Así se va formando la base de datos de jugadores, árbitros y
+  administradores con huella enrolada.
+</p>
+
+{% macro seccion_biometria(titulo, personas, tipo_persona, obtener_correo=None) %}
+<div class="card mb-4">
+  <div class="card-header bg-white fw-semibold">{{ titulo }}</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Nombre</th>
+          <th class="d-none d-md-table-cell">Correo</th>
+          <th class="text-center">Huella</th>
+          <th class="text-center">Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for persona in personas %}
+        {% set registrada = (tipo_persona, persona.id) in huellas %}
+        <tr>
+          <td>
+            {% if persona.nombre_completo is defined %}
+              {{ persona.nombre_completo() }}
+            {% elif persona.nombres is defined %}
+              {{ persona.nombres }}
+            {% else %}
+              {{ persona.correo }}
+            {% endif %}
+          </td>
+          <td class="d-none d-md-table-cell text-body-secondary">
+            {{ persona.correo or "—" }}
+          </td>
+          <td class="text-center">{{ badge_huella(registrada) }}</td>
+          <td class="text-center">
+            <form method="post" class="form-huella d-inline"
+                  action="{{ url_for('registrar_huella', tipo_persona=tipo_persona, persona_id=persona.id) }}">
+              <button type="submit" class="btn btn-sm btn-outline-success">
+                {% if registrada %}Volver a registrar{% else %}Registrar{% endif %}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" class="text-center text-body-secondary py-3">
+            No hay registros en esta categoría todavía.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endmacro %}
+
+{{ seccion_biometria("Jugadores", jugadores, "jugador") }}
+{{ seccion_biometria("Árbitros", arbitros, "arbitro") }}
+{{ seccion_biometria("Administradores", administradores, "administrador") }}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  {# La captura la hace Flask del lado del servidor: solo avisamos que
+     está en curso mientras se espera la respuesta. #}
+  document.querySelectorAll(".form-huella").forEach((form) => {
+    form.addEventListener("submit", () => {
+      const boton = form.querySelector("button");
+      boton.disabled = true;
+      boton.textContent = "{% if modo_huella == 'secugen' %}Coloque el dedo…{% else %}Registrando…{% endif %}";
+    });
+  });
+</script>
+{% endblock %}

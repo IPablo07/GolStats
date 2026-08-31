@@ -25,6 +25,19 @@
           </div>
           <button type="submit" class="btn btn-success w-100">Ingresar</button>
         </form>
+
+        {% if modo_huella == 'secugen' %}
+        <div class="d-flex align-items-center my-3">
+          <hr class="flex-grow-1">
+          <span class="px-2 small text-body-secondary">o</span>
+          <hr class="flex-grow-1">
+        </div>
+        <form method="post" action="{{ url_for('login_huella') }}" id="form-login-huella">
+          <button type="submit" class="btn btn-outline-success w-100" id="btn-login-huella">
+            <i class="bi bi-fingerprint"></i> Ingresar como administrador con huella
+          </button>
+        </form>
+        {% endif %}
       </div>
     </div>
 
@@ -38,4 +51,16 @@
 
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if modo_huella == 'secugen' %}
+<script>
+  document.getElementById("form-login-huella").addEventListener("submit", () => {
+    const boton = document.getElementById("btn-login-huella");
+    boton.disabled = true;
+    boton.textContent = "Coloque el dedo en el lector…";
+  });
+</script>
+{% endif %}
 {% endblock %}
