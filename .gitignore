@@ -4,6 +4,9 @@ __pycache__/
 .env
 *.sqlite3
 instance/
-.vscode/
+# Se comparte solo settings.json (avisos del editor, exclusiones);
+# lo demas de .vscode es de cada quien.
+.vscode/*
+!.vscode/settings.json
 .idea/
 .DS_Store
