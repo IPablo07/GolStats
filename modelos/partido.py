@@ -33,6 +33,13 @@ class EventoPartido:
         self.registrado_en = datetime.now()
 
     def descripcion(self):
+        """
+        Texto del evento para la línea de tiempo del partido.
+
+        Cada subclase lo redefine. Gracias a eso, obtener_eventos() puede
+        mezclar goles y tarjetas en una sola lista y la plantilla los
+        recorre sin preguntar de qué tipo es cada uno.
+        """
         raise NotImplementedError("Cada evento debe definir su propia descripcion()")
 
     def __repr__(self):
@@ -105,6 +112,20 @@ class CheckIn(EventoPartido):
 # ══════════════════════════════════════════════════════════════════
 
 class Partido:
+    """
+    Un partido entre dos equipos, con toda su vocalía.
+
+    Es la clase que concentra las reglas del negocio. El estado avanza solo
+    por los métodos de transición, y cada uno valida antes de dejar pasar:
+
+        programado --> primer_tiempo    exige que todos hayan hecho check-in
+        medio_tiempo --> segundo_tiempo exige que los dos equipos hayan pagado
+                                        (si no, se declara walkover)
+
+    Las colecciones internas (_convocados, _checkins, _goles, _tarjetas,
+    _pagos) son privadas porque registrar un gol también actualiza el
+    marcador: agregarlo por fuera dejaría el partido incoherente.
+    """
 
     PROGRAMADO = "programado"
     PRIMER_TIEMPO = "primer_tiempo"
@@ -185,6 +206,13 @@ class Partido:
     # ── Convocatoria ──────────────────────────────────────────────
 
     def convocar(self, jugador):
+        """
+        Anota a un jugador en la lista de convocados.
+
+        Solo se puede convocar con el partido todavía programado, y el
+        jugador tiene que pertenecer a alguno de los dos equipos. Lanza
+        ValueError si ya estaba convocado.
+        """
         if self._estado != Partido.PROGRAMADO:
             raise ValueError(
                 "Solo se puede convocar jugadores mientras el partido está programado"
@@ -210,6 +238,13 @@ class Partido:
     # ── Check-in ──────────────────────────────────────────────────
 
     def registrar_checkin(self, jugador, metodo=CheckIn.HUELLA):
+        """
+        Confirma que el jugador se presentó, antes de que arranque el partido.
+
+        La huella ya se validó afuera (ver servicios/huella.py): acá solo se
+        deja el registro. Exige que el jugador esté convocado y que no haya
+        hecho check-in antes.
+        """
         if self._estado != Partido.PROGRAMADO:
             raise ValueError(
                 "El check-in solo se puede hacer antes de que inicie el partido"
@@ -237,6 +272,12 @@ class Partido:
         return [j for j in self._convocados if not self.tiene_checkin(j)]
 
     def todos_confirmaron(self):
+        """
+        True si todos los convocados hicieron check-in.
+
+        Un partido sin convocados devuelve False, no True: no tendría sentido
+        dejar arrancar un partido con la lista vacía.
+        """
         return len(self._convocados) > 0 and len(self.jugadores_sin_checkin()) == 0
 
     # ── Pagos de vocalía ──────────────────────────────────────────
@@ -283,6 +324,12 @@ class Partido:
         return self._estado
 
     def terminar_primer_tiempo(self):
+        """
+        Manda el partido al medio tiempo.
+
+        Es el momento en que hay que cobrarle la vocalía a los equipos que
+        todavía deben: al reanudar, el que no pagó pierde por walkover.
+        """
         if self._estado != Partido.PRIMER_TIEMPO:
             raise ValueError("Solo se puede ir al medio tiempo desde el primer tiempo")
         self._estado = Partido.MEDIO_TIEMPO
@@ -375,6 +422,12 @@ class Partido:
         return gol
 
     def registrar_tarjeta(self, jugador, tipo, minuto):
+        """
+        Carga una tarjeta que el árbitro anotó en papel.
+
+        Como con los goles, el partido tiene que estar en juego y el jugador
+        tiene que haber hecho check-in: si no jugó, no lo pudieron amonestar.
+        """
         self._validar_registro_en_juego(jugador)
         tarjeta = Tarjeta(self, jugador, tipo, minuto)
         self._tarjetas.append(tarjeta)
