@@ -14,18 +14,24 @@ fueran aleatorios de verdad, cada uno vería una tabla de posiciones
 distinta y no podríamos comparar resultados entre nosotros.
 
 Cuentas de prueba:
-    admin@golstats.com / admin123
-    cualquier jugador  / jugador123   (ver BD.jugadores)
+    admin@golstats.com     / admin123      (administrador)
+    jugadores@golstats.com / jugadores123  (cuenta unica, la misma para todos)
+
+Ya no hay una cuenta por jugador: todos los jugadores entran con la
+misma cuenta compartida (ver modelos.usuario.CuentaJugadores).
 """
 
 import random
 from datetime import datetime, timedelta
 
 from modelos import (
-    Administrador, Jugador, Equipo, Arbitro, Partido, Tarjeta, CheckIn,
+    Administrador, CuentaJugadores, Jugador, Equipo, Arbitro, Partido,
+    Tarjeta, CheckIn,
 )
 
-PASSWORD_JUGADORES = "jugador123"
+# Credenciales de la cuenta unica de jugadores: una sola, igual para todos.
+CORREO_JUGADORES = "jugadores@golstats.com"
+PASSWORD_JUGADORES = "jugadores123"
 PASSWORD_ADMIN = "admin123"
 
 # Cambiar este número genera otro torneo distinto, pero igual de estable.
@@ -141,7 +147,7 @@ class BaseDatosMemoria:
 # ══════════════════════════════════════════════════════════════════
 
 def _crear_equipos(bd):
-    """Arma los cuatro equipos con sus plantillas y sus cuentas."""
+    """Arma los cuatro equipos con sus plantillas."""
     for ficha in EQUIPOS:
         equipo = Equipo(
             ficha["id"], ficha["nombre"], ficha["capitan"], ficha["correo_capitan"]
@@ -152,8 +158,9 @@ def _crear_equipos(bd):
             jugador_id = len(bd.jugadores) + 1
             jugador = Jugador(
                 id=jugador_id,
+                # Dato de contacto, no una credencial: el jugador no
+                # inicia sesion con esto.
                 correo=f"{nombres.split()[0].lower()}.{apellidos.lower()}@golstats.com",
-                password_plano=PASSWORD_JUGADORES,
                 equipo=equipo,
                 nombres=nombres,
                 apellidos=apellidos,
@@ -162,7 +169,6 @@ def _crear_equipos(bd):
             )
             equipo.agregar_jugador(jugador)
             bd.jugadores.append(jugador)
-            bd.usuarios.append(jugador)
 
 
 def _calendario(equipos):
@@ -247,9 +253,15 @@ def crear_datos_prueba():
     azar = random.Random(SEMILLA)
     bd = BaseDatosMemoria()
 
+    # Las unicas dos cuentas del sistema: el administrador y la cuenta
+    # compartida con la que entran todos los jugadores.
     bd.usuarios.append(
         Administrador(id=1000, correo="admin@golstats.com",
                       password_plano=PASSWORD_ADMIN)
+    )
+    bd.usuarios.append(
+        CuentaJugadores(id=1001, correo=CORREO_JUGADORES,
+                        password_plano=PASSWORD_JUGADORES)
     )
 
     bd.arbitros = [

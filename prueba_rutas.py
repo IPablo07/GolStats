@@ -12,7 +12,7 @@ Ejecutar:  python prueba_rutas.py
 """
 
 from app import app
-from datos_prueba import BD
+from datos_prueba import BD, CORREO_JUGADORES, PASSWORD_JUGADORES
 from modelos import Partido
 
 # ── Casos sacados de los datos, no escritos a mano ────────────────
@@ -99,20 +99,46 @@ with app.test_client() as cliente:
     cliente.get("/logout")
 
 with app.test_client() as cliente:
-    jugador = BD.jugadores[1]
-    cliente.post("/", data={"correo": jugador.correo, "password": "jugador123"},
-                 follow_redirects=True)
+    # Una sola cuenta compartida: ya no se entra con el correo de un jugador.
+    r = cliente.post("/", data={"correo": BD.jugadores[1].correo,
+                                "password": PASSWORD_JUGADORES},
+                     follow_redirects=True)
+    comprobar("el correo de un jugador ya no sirve para entrar",
+              "incorrectos" in r.get_data(as_text=True))
+
+    r = cliente.post("/", data={"correo": CORREO_JUGADORES,
+                                "password": PASSWORD_JUGADORES},
+                     follow_redirects=True)
+    comprobar("login con la cuenta unica de jugadores", r.status_code == 200)
     revisar(cliente, "PANTALLAS COMO JUGADOR")
 
-    print("\n=== LIMITES DEL JUGADOR ===")
-    otro = next(j for j in BD.jugadores if j.id != jugador.id)
-    r = cliente.get(f"/jugadores/{otro.id}", follow_redirects=True)
-    comprobar("no puede ver la ficha de otro jugador",
-              "propias" in r.get_data(as_text=True))
+    print()
+    print("=== LO QUE VE LA CUENTA DE JUGADORES ===")
+    cuerpo = cliente.get("/panel", follow_redirects=True).get_data(as_text=True)
+    comprobar("el inicio trae la tabla de partidos", "Partidos" in cuerpo)
+    comprobar("el inicio trae la tabla de posiciones",
+              "Tabla de posiciones" in cuerpo)
 
+    # Desde Equipos se llega a la ficha de cualquier jugador, sea del
+    # equipo que sea: antes solo se dejaba ver la propia.
+    for jugador in (BD.equipos[0].obtener_jugadores()[0],
+                    BD.equipos[-1].obtener_jugadores()[-1]):
+        r = cliente.get(f"/jugadores/{jugador.id}", follow_redirects=True)
+        comprobar(f"ve las estadisticas de {jugador.nombre_completo()} "
+                  f"({jugador.equipo.nombre})",
+                  r.status_code == 200
+                  and jugador.nombre_completo() in r.get_data(as_text=True))
+
+    print()
+    print("=== LIMITES DE LA CUENTA DE JUGADORES ===")
     r = cliente.post(f"/partidos/{PROGRAMADO.id}/pago",
                      data={"equipo_id": SIN_PAGAR.id}, follow_redirects=True)
     comprobar("no puede registrar pagos",
+              "administradores" in r.get_data(as_text=True))
+
+    r = cliente.get(f"/partidos/{PROGRAMADO.id}/cronometro",
+                    follow_redirects=True)
+    comprobar("no puede leer el cronometro del admin",
               "administradores" in r.get_data(as_text=True))
 
 print(f"\n{'=' * 50}")

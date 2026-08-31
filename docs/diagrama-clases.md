@@ -25,15 +25,19 @@ classDiagram
         +panel_info() dict
     }
 
+    class CuentaJugadores {
+        +panel_info() dict
+    }
+
     class Jugador {
+        +int id
+        +str correo
         +Equipo equipo
         +str nombres
         +str apellidos
         +str cedula
         +int numero_camiseta
-        +str codigo_huella
         +nombre_completo() str
-        +panel_info() dict
     }
 
     class Equipo {
@@ -74,6 +78,8 @@ classDiagram
         -list _goles
         -list _tarjetas
         -dict _pagos
+        -float _segundos_jugados
+        -datetime _reloj_desde
         +estado() str
         +convocar(jugador)
         +registrar_checkin(jugador, metodo) CheckIn
@@ -87,6 +93,10 @@ classDiagram
         +completar_pago(equipo) PagoVocalia
         +obtener_eventos() list
         +marcador() str
+        +minuto_actual() int
+        +fase_reloj() str
+        +reloj_corriendo() bool
+        +cronometro() dict
     }
 
     class PagoVocalia {
@@ -128,7 +138,7 @@ classDiagram
     }
 
     Usuario <|-- Administrador
-    Usuario <|-- Jugador
+    Usuario <|-- CuentaJugadores
     EventoPartido <|-- Gol
     EventoPartido <|-- Tarjeta
     EventoPartido <|-- CheckIn
@@ -311,16 +321,49 @@ pagó. Si ninguno de los dos pagó, se cierra sin ganador.
 
 ## 5. Decisiones de diseño
 
-### Por qué `Jugador` hereda de `Usuario`
+### Por qué `Jugador` ya no hereda de `Usuario`
 
-En este sistema un jugador **es** un usuario: entra con correo y contraseña a ver
-sus estadísticas. Modelarlo como una clase aparte con un campo `usuario_id`
-habría obligado a mantener dos objetos sincronizados para representar a una sola
-persona. La herencia refleja mejor la realidad y evita ese problema.
+Al principio un jugador **era** un usuario: cada uno entraba con su correo y su
+contraseña a ver sus propias estadísticas, y la herencia evitaba mantener dos
+objetos sincronizados para una sola persona.
 
-`Administrador` y `Jugador` redefinen `panel_info()`: la ruta `/panel` llama al
-mismo método sin preguntar el rol, y cada clase responde con lo suyo. Eso es
-polimorfismo resolviendo un `if` que si no habría que repetir en cada vista.
+Eso cambió cuando se pasó a **una sola cuenta compartida** para todos los
+jugadores. Lo que un jugador consulta —partidos, posiciones y estadísticas de
+cualquier jugador— es información pública del torneo, igual para todos: una
+cuenta por persona obligaba a crear, repartir y resetear decenas de contraseñas
+sin proteger ningún dato privado.
+
+Con esa decisión, *usuario* y *jugador* dejaron de ser la misma cosa:
+
+- `CuentaJugadores` es la cuenta: hereda de `Usuario`, tiene credenciales y es
+  anónima (no tiene equipo ni camiseta, porque no representa a nadie en
+  concreto).
+- `Jugador` es la persona: una entidad del dominio, sujeto de estadísticas, sin
+  credenciales. Su `correo` quedó como dato de contacto, no como login.
+
+`Administrador` y `CuentaJugadores` redefinen `panel_info()`: la ruta `/panel`
+llama al mismo método sin preguntar el rol, y cada clase responde con lo suyo.
+Eso es polimorfismo resolviendo un `if` que si no habría que repetir en cada
+vista.
+
+### Por qué el cronómetro vive en `Partido` y no en el navegador
+
+El reloj del partido no guarda "el minuto" como un número que alguien
+incrementa: guarda los segundos ya acumulados (`_segundos_jugados`) más el
+instante en que arrancó el tramo actual (`_reloj_desde`). El minuto se calcula
+al consultarlo.
+
+Eso lo hace inmune a los problemas del enfoque obvio (un contador en
+JavaScript): el tiempo sigue corriendo aunque nadie tenga la vocalía abierta,
+recargar la página no lo reinicia, y dos pantallas mirando el mismo partido no
+pueden mostrar minutos distintos. El navegador solo pinta el número y cada
+10 segundos se resincroniza contra `/partidos/<id>/cronometro`.
+
+Quien manda es el administrador, no un temporizador automático: el reloj
+arranca, se pausa y se reanuda enganchado a las transiciones de estado que él
+dispara (`iniciar_primer_tiempo`, `terminar_primer_tiempo`,
+`iniciar_segundo_tiempo`). Por eso el medio tiempo no dura un tiempo fijo: dura
+lo que el admin decida, y no suma minutos al partido.
 
 ### Por qué existe `EventoPartido`
 

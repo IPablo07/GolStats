@@ -5,7 +5,7 @@ Prueba rápida de las clases del dominio, sin base de datos ni Flask.
 Ejecutar:  python prueba_modelos.py
 """
 
-from datos_prueba import BD
+from datos_prueba import BD, CORREO_JUGADORES, PASSWORD_JUGADORES
 from modelos import Partido
 from servicios import estadisticas
 
@@ -61,6 +61,31 @@ print(f"  admin password correcta: {u.verificar_password('admin123')}")
 print(f"  admin password incorrecta: {u.verificar_password('otra')}")
 print(f"  panel: {u.panel_info()['mensaje']}")
 
-j = BD.buscar_usuario_por_correo("bryan.vera@golstats.com")
+# Ya no hay una cuenta por jugador: todos comparten esta.
+c = BD.buscar_usuario_por_correo(CORREO_JUGADORES)
+print(f"  cuenta de jugadores: {c.correo} (rol {c.rol})")
+print(f"  password correcta: {c.verificar_password(PASSWORD_JUGADORES)}")
+print(f"  panel: {c.panel_info()['mensaje']}")
+
+# El jugador ya no es un usuario, es solo sujeto de estadisticas.
+j = BD.jugadores[1]
+print(f"  ya no inicia sesion: {BD.buscar_usuario_por_correo(j.correo) is None}")
 print(f"  jugador: {j.nombre_completo()} - {j.equipo.nombre} #{j.numero_camiseta}")
 print(f"  stats: {estadisticas.estadisticas_jugador(j, BD.partidos)}")
+
+separador("CRONOMETRO")
+pc = BD.buscar_partido(12)
+print(f"  antes de iniciar: {pc.minuto_actual()}' - {pc.fase_reloj()}")
+for jugador in pc.obtener_convocados():
+    pc.registrar_checkin(jugador)
+pc.iniciar_primer_tiempo()
+print(f"  tras iniciar:     {pc.minuto_actual()}' - {pc.fase_reloj()} "
+      f"(corriendo: {pc.reloj_corriendo()})")
+pc.terminar_primer_tiempo()
+print(f"  en el descanso:   {pc.minuto_actual()}' - {pc.fase_reloj()} "
+      f"(corriendo: {pc.reloj_corriendo()})")
+for equipo in pc.equipos():
+    pc.completar_pago(equipo)
+pc.iniciar_segundo_tiempo()
+print(f"  segundo tiempo:   {pc.minuto_actual()}' - {pc.fase_reloj()} "
+      f"(corriendo: {pc.reloj_corriendo()})")

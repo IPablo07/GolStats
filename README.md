@@ -44,10 +44,12 @@ Postgres local, ajústalo ahí.
 | Rol | Correo | Contraseña |
 |---|---|---|
 | Administrador | `admin@golstats.com` | `admin123` |
-| Jugador | `bryan.vera@golstats.com` | `jugador123` |
+| Jugadores | `jugadores@golstats.com` | `jugadores123` |
 
-Los demás jugadores usan `nombre.apellido@golstats.com` / `jugador123`
-(ver `datos_prueba.py`).
+La de jugadores es **una sola cuenta compartida**: todos entran con la
+misma, no hay una por persona. Da acceso de lectura a los partidos, la
+tabla de posiciones y las estadísticas de cualquier jugador de cualquier
+equipo (ver `modelos/usuario.py`).
 
 ## Estado actual
 

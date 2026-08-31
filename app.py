@@ -215,11 +215,13 @@ def panel():
             bandeja=correo.bandeja()[:5],
         )
 
+    # La cuenta de jugadores es una sola y compartida: no representa a
+    # nadie en particular, así que su inicio muestra lo que le sirve a
+    # cualquiera del torneo — la tabla de partidos y la de posiciones.
     return render_template(
         "panel_jugador.html",
         info=info,
-        resumen=estadisticas.estadisticas_jugador(usuario, BD.partidos),
-        partidos=BD.partidos_de_jugador(usuario),
+        partidos=sorted(BD.partidos, key=lambda p: p.fecha_hora, reverse=True),
         posiciones=estadisticas.tabla_posiciones(BD.equipos, BD.partidos),
     )
 
@@ -259,11 +261,10 @@ def jugador_detalle(jugador_id):
     if jugador is None:
         abort(404)
 
-    usuario = usuario_actual()
-    if usuario.rol != "admin" and usuario.id != jugador.id:
-        flash("Solo puede ver sus propias estadísticas.", "danger")
-        return redirect(url_for("panel"))
-
+    # Sin restricción por dueño: con la cuenta compartida no hay "mis"
+    # estadísticas, y desde Equipos se llega a la ficha de cualquier
+    # jugador de cualquier equipo. Escribir sigue siendo solo del admin
+    # (el botón de enrolar huella lo controla la plantilla).
     return render_template(
         "jugador_detalle.html",
         jugador=jugador,
@@ -434,6 +435,23 @@ def cambiar_estado(partido_id):
         flash(f"El partido pasó a {nuevo_estado.replace('_', ' ')}.", "success")
 
     return redirect(url_for("partido_detalle", partido_id=partido.id))
+
+
+@app.route("/partidos/<int:partido_id>/cronometro")
+@admin_requerido
+def cronometro(partido_id):
+    """
+    Minuto y fase del partido, para el reloj de la vocalía.
+
+    El reloj real vive en el objeto Partido (servidor): esta ruta solo lo
+    lee. La pantalla la consulta cada pocos segundos para resincronizarse,
+    así el minuto no se desvía aunque el admin recargue o abra la vocalía
+    en otra máquina.
+    """
+    partido = BD.buscar_partido(partido_id)
+    if partido is None:
+        abort(404)
+    return jsonify(partido.cronometro())
 
 
 @app.route("/partidos/<int:partido_id>/gol", methods=["POST"])
