@@ -8,11 +8,17 @@ Cuando entre PostgreSQL, este archivo se reemplaza por consultas
 reales: el resto del código sigue pidiendo lo mismo (BD.equipos,
 BD.buscar_usuario_por_correo(), etc.).
 
+Los partidos se simulan con una semilla fija, así que los goles y las
+tarjetas son siempre los mismos en todas las máquinas del equipo. Si
+fueran aleatorios de verdad, cada uno vería una tabla de posiciones
+distinta y no podríamos comparar resultados entre nosotros.
+
 Cuentas de prueba:
     admin@golstats.com / admin123
     cualquier jugador  / jugador123   (ver BD.jugadores)
 """
 
+import random
 from datetime import datetime, timedelta
 
 from modelos import (
@@ -22,9 +28,70 @@ from modelos import (
 PASSWORD_JUGADORES = "jugador123"
 PASSWORD_ADMIN = "admin123"
 
+# Cambiar este número genera otro torneo distinto, pero igual de estable.
+SEMILLA = 2026
+
+EQUIPOS = [
+    {
+        "id": 1,
+        "nombre": "Leones FC",
+        "capitan": "Andrés Salazar",
+        "correo_capitan": "capitan.leones@golstats.com",
+        "jugadores": [
+            ("Andrés", "Salazar"), ("Bryan", "Vera"), ("Carlos", "Loor"),
+            ("Diego", "Moran"), ("Erick", "Zambrano"), ("Fabián", "Ortiz"),
+            ("Gustavo", "Reyes"), ("Henry", "Quinteros"),
+        ],
+    },
+    {
+        "id": 2,
+        "nombre": "Águilas SC",
+        "capitan": "Fernando Ruiz",
+        "correo_capitan": "capitan.aguilas@golstats.com",
+        "jugadores": [
+            ("Fernando", "Ruiz"), ("Gabriel", "Ponce"), ("Hugo", "Cedeño"),
+            ("Iván", "Bravo"), ("Jorge", "Alvarado"), ("Kléber", "Mina"),
+            ("Luis", "Andrade"), ("Manuel", "Vinueza"),
+        ],
+    },
+    {
+        "id": 3,
+        "nombre": "Tiburones FC",
+        "capitan": "Kevin Ortega",
+        "correo_capitan": "capitan.tiburones@golstats.com",
+        "jugadores": [
+            ("Kevin", "Ortega"), ("Luis", "Naranjo"), ("Marco", "Villacis"),
+            ("Nestor", "Chavez"), ("Oscar", "Pinto"), ("Pablo", "Guaman"),
+            ("Ramiro", "Toapanta"), ("Santiago", "Lema"),
+        ],
+    },
+    {
+        "id": 4,
+        "nombre": "Halcones United",
+        "capitan": "Pedro Sanchez",
+        "correo_capitan": "capitan.halcones@golstats.com",
+        "jugadores": [
+            ("Pedro", "Sanchez"), ("Raul", "Guerrero"), ("Sergio", "Tapia"),
+            ("Tomas", "Aguirre"), ("Victor", "Cruz"), ("Walter", "Yepez"),
+            ("Wilson", "Cadena"), ("Xavier", "Montalvo"),
+        ],
+    },
+]
+
+# Cuántos goles hace un equipo en un tiempo: casi siempre 0 o 1, a veces más.
+GOLES_POR_TIEMPO = [0, 0, 1, 1, 1, 2, 2, 3]
+TARJETAS_POR_TIEMPO = [0, 1, 1, 2]
+PROBABILIDAD_ASISTENCIA = 0.60
+PROBABILIDAD_ROJA = 0.15
+
 
 class BaseDatosMemoria:
-    """Contenedor simple que hace de repositorio mientras no hay BD."""
+    """
+    Hace de repositorio mientras no exista la base de datos real.
+
+    Expone los mismos métodos de búsqueda que va a tener la capa de
+    PostgreSQL, para que las rutas de Flask no se enteren del cambio.
+    """
 
     def __init__(self):
         self.usuarios = []
@@ -69,180 +136,172 @@ class BaseDatosMemoria:
         return [p for p in self.partidos if p.esta_convocado(jugador)]
 
 
-def _crear_equipo(bd, id, nombre, capitan, correo_capitan, plantilla):
-    equipo = Equipo(id, nombre, capitan, correo_capitan)
-    bd.equipos.append(equipo)
+# ══════════════════════════════════════════════════════════════════
+#  Construcción de los datos
+# ══════════════════════════════════════════════════════════════════
 
-    for numero, (nombres, apellidos, cedula) in enumerate(plantilla, start=1):
-        jugador_id = len(bd.jugadores) + 1
-        correo = f"{nombres.split()[0].lower()}.{apellidos.split()[0].lower()}@golstats.com"
-        jugador = Jugador(
-            id=jugador_id,
-            correo=correo,
-            password_plano=PASSWORD_JUGADORES,
-            equipo=equipo,
-            nombres=nombres,
-            apellidos=apellidos,
-            cedula=cedula,
-            numero_camiseta=numero,
+def _crear_equipos(bd):
+    """Arma los cuatro equipos con sus plantillas y sus cuentas."""
+    for ficha in EQUIPOS:
+        equipo = Equipo(
+            ficha["id"], ficha["nombre"], ficha["capitan"], ficha["correo_capitan"]
         )
-        equipo.agregar_jugador(jugador)
-        bd.jugadores.append(jugador)
-        bd.usuarios.append(jugador)
+        bd.equipos.append(equipo)
 
-    return equipo
-
-
-def crear_datos_prueba():
-    bd = BaseDatosMemoria()
-
-    # ── Administrador ─────────────────────────────────────────────
-    admin = Administrador(id=1000, correo="admin@golstats.com",
-                          password_plano=PASSWORD_ADMIN)
-    bd.usuarios.append(admin)
-
-    # ── Árbitros (catálogo, sin cuenta) ───────────────────────────
-    bd.arbitros = [
-        Arbitro(1, "Carlos Mendoza", "cmendoza@golstats.com", "0991112233"),
-        Arbitro(2, "Luis Paredes", "lparedes@golstats.com", "0994445566"),
-    ]
-
-    # ── Equipos y jugadores ───────────────────────────────────────
-    leones = _crear_equipo(
-        bd, 1, "Leones FC", "Andrés Salazar", "capitan.leones@golstats.com",
-        [
-            ("Andrés", "Salazar", "0102030405"),
-            ("Bryan", "Vera", "0102030406"),
-            ("Carlos", "Loor", "0102030407"),
-            ("Diego", "Moran", "0102030408"),
-            ("Erick", "Zambrano", "0102030409"),
-        ],
-    )
-    aguilas = _crear_equipo(
-        bd, 2, "Águilas SC", "Fernando Ruiz", "capitan.aguilas@golstats.com",
-        [
-            ("Fernando", "Ruiz", "0202030405"),
-            ("Gabriel", "Ponce", "0202030406"),
-            ("Hugo", "Cedeño", "0202030407"),
-            ("Iván", "Bravo", "0202030408"),
-            ("Jorge", "Alvarado", "0202030409"),
-        ],
-    )
-    tiburones = _crear_equipo(
-        bd, 3, "Tiburones FC", "Kevin Ortega", "capitan.tiburones@golstats.com",
-        [
-            ("Kevin", "Ortega", "0302030405"),
-            ("Luis", "Naranjo", "0302030406"),
-            ("Marco", "Villacis", "0302030407"),
-            ("Nestor", "Chavez", "0302030408"),
-            ("Oscar", "Pinto", "0302030409"),
-        ],
-    )
-    halcones = _crear_equipo(
-        bd, 4, "Halcones United", "Pedro Sanchez", "capitan.halcones@golstats.com",
-        [
-            ("Pedro", "Sanchez", "0402030405"),
-            ("Raul", "Guerrero", "0402030406"),
-            ("Sergio", "Tapia", "0402030407"),
-            ("Tomas", "Aguirre", "0402030408"),
-            ("Victor", "Cruz", "0402030409"),
-        ],
-    )
-
-    hoy = datetime.now().replace(minute=0, second=0, microsecond=0)
-
-    # ── Partido 1: jugado de principio a fin ──────────────────────
-    p1 = Partido(1, leones, aguilas, hoy - timedelta(days=7), bd.arbitros[0])
-    _jugar_partido_completo(
-        p1,
-        goles_primer_tiempo=[
-            (leones.obtener_jugadores()[1], 12, leones.obtener_jugadores()[0]),
-            (aguilas.obtener_jugadores()[2], 27, None),
-        ],
-        goles_segundo_tiempo=[
-            (leones.obtener_jugadores()[1], 58, leones.obtener_jugadores()[3]),
-            (leones.obtener_jugadores()[4], 71, None),
-        ],
-        tarjetas=[
-            (aguilas.obtener_jugadores()[3], Tarjeta.AMARILLA, 35),
-            (aguilas.obtener_jugadores()[3], Tarjeta.ROJA, 64),
-        ],
-    )
-    bd.partidos.append(p1)
-
-    # ── Partido 2: walkover porque Halcones no pagó la vocalía ────
-    p2 = Partido(2, tiburones, halcones, hoy - timedelta(days=5), bd.arbitros[1])
-    p2.convocar_varios(tiburones.obtener_jugadores() + halcones.obtener_jugadores())
-    for jugador in p2.obtener_convocados():
-        p2.registrar_checkin(jugador, CheckIn.HUELLA)
-    p2.iniciar_primer_tiempo()
-    p2.registrar_gol(tiburones.obtener_jugadores()[0], 20)
-    p2.terminar_primer_tiempo()
-    p2.completar_pago(tiburones)          # Halcones nunca pagó
-    p2.iniciar_segundo_tiempo()           # dispara el walkover automático
-    bd.partidos.append(p2)
-
-    # ── Partido 3: jugado, con empate ─────────────────────────────
-    p3 = Partido(3, aguilas, tiburones, hoy - timedelta(days=2), bd.arbitros[0])
-    _jugar_partido_completo(
-        p3,
-        goles_primer_tiempo=[
-            (aguilas.obtener_jugadores()[0], 15, aguilas.obtener_jugadores()[1]),
-        ],
-        goles_segundo_tiempo=[
-            (tiburones.obtener_jugadores()[1], 62, tiburones.obtener_jugadores()[0]),
-        ],
-        tarjetas=[
-            (tiburones.obtener_jugadores()[4], Tarjeta.AMARILLA, 78),
-        ],
-    )
-    bd.partidos.append(p3)
-
-    # ── Partido 4: programado, con check-in a medias ──────────────
-    p4 = Partido(4, leones, halcones, hoy + timedelta(days=2), bd.arbitros[1])
-    p4.convocar_varios(leones.obtener_jugadores() + halcones.obtener_jugadores())
-    for jugador in leones.obtener_jugadores()[:3]:
-        p4.registrar_checkin(jugador, CheckIn.HUELLA)
-    p4.completar_pago(leones)
-    bd.partidos.append(p4)
-
-    # ── Partido 5: programado, sin nada todavía ───────────────────
-    p5 = Partido(5, halcones, aguilas, hoy + timedelta(days=5), bd.arbitros[0])
-    p5.convocar_varios(halcones.obtener_jugadores() + aguilas.obtener_jugadores())
-    bd.partidos.append(p5)
-
-    return bd
+        for numero, (nombres, apellidos) in enumerate(ficha["jugadores"], start=1):
+            jugador_id = len(bd.jugadores) + 1
+            jugador = Jugador(
+                id=jugador_id,
+                correo=f"{nombres.split()[0].lower()}.{apellidos.lower()}@golstats.com",
+                password_plano=PASSWORD_JUGADORES,
+                equipo=equipo,
+                nombres=nombres,
+                apellidos=apellidos,
+                cedula=str(1700000000 + jugador_id),
+                numero_camiseta=numero,
+            )
+            equipo.agregar_jugador(jugador)
+            bd.jugadores.append(jugador)
+            bd.usuarios.append(jugador)
 
 
-def _jugar_partido_completo(partido, goles_primer_tiempo, goles_segundo_tiempo,
-                            tarjetas):
-    """Recorre el ciclo de vida completo: convocatoria → check-in → final."""
+def _calendario(equipos):
+    """Todos contra todos, ida y vuelta: 12 partidos entre 4 equipos."""
+    enfrentamientos = []
+    for local in equipos:
+        for visitante in equipos:
+            if local.id != visitante.id:
+                enfrentamientos.append((local, visitante))
+    return enfrentamientos
+
+
+def _generar_eventos(partido, azar, minuto_desde, minuto_hasta):
+    """Reparte goles y tarjetas dentro de un tiempo del partido."""
+    for equipo in partido.equipos():
+        plantel = partido.obtener_convocados(equipo)
+        for _ in range(azar.choice(GOLES_POR_TIEMPO)):
+            goleador = azar.choice(plantel)
+            asistente = None
+            if azar.random() < PROBABILIDAD_ASISTENCIA:
+                companeros = [j for j in plantel if j.id != goleador.id]
+                asistente = azar.choice(companeros)
+            partido.registrar_gol(
+                goleador, azar.randint(minuto_desde, minuto_hasta), asistente
+            )
+
+    for _ in range(azar.choice(TARJETAS_POR_TIEMPO)):
+        equipo = azar.choice(partido.equipos())
+        jugador = azar.choice(partido.obtener_convocados(equipo))
+        tipo = Tarjeta.ROJA if azar.random() < PROBABILIDAD_ROJA else Tarjeta.AMARILLA
+        partido.registrar_tarjeta(jugador, tipo, azar.randint(minuto_desde, minuto_hasta))
+
+
+def _convocar_y_confirmar(partido):
+    """Convoca a las dos plantillas completas y les hace el check-in."""
     convocados = (partido.equipo_local.obtener_jugadores()
                   + partido.equipo_visitante.obtener_jugadores())
     partido.convocar_varios(convocados)
     for jugador in convocados:
         partido.registrar_checkin(jugador, CheckIn.HUELLA)
+    return convocados
 
+
+def _jugar_partido(partido, azar):
+    """Recorre el ciclo completo: convocatoria, check-in, dos tiempos y cierre."""
+    _convocar_y_confirmar(partido)
     partido.iniciar_primer_tiempo()
-    for jugador, minuto, asistente in goles_primer_tiempo:
-        partido.registrar_gol(jugador, minuto, asistente)
-    for jugador, tipo, minuto in tarjetas:
-        if minuto <= 45:
-            partido.registrar_tarjeta(jugador, tipo, minuto)
-
+    _generar_eventos(partido, azar, 1, 45)
     partido.terminar_primer_tiempo()
+
     for equipo in partido.equipos():
         partido.completar_pago(equipo)
+
     partido.iniciar_segundo_tiempo()
-
-    for jugador, minuto, asistente in goles_segundo_tiempo:
-        partido.registrar_gol(jugador, minuto, asistente)
-    for jugador, tipo, minuto in tarjetas:
-        if minuto > 45:
-            partido.registrar_tarjeta(jugador, tipo, minuto)
-
+    _generar_eventos(partido, azar, 46, 90)
     partido.finalizar()
     return partido
+
+
+def _jugar_walkover(partido, azar, equipo_moroso):
+    """
+    Igual que _jugar_partido, pero uno de los dos equipos nunca paga.
+
+    Al llamar a iniciar_segundo_tiempo(), el propio Partido detecta la deuda
+    y se declara walkover solo. Sirve para tener ese caso en pantalla.
+    """
+    _convocar_y_confirmar(partido)
+    partido.iniciar_primer_tiempo()
+    _generar_eventos(partido, azar, 1, 45)
+    partido.terminar_primer_tiempo()
+
+    for equipo in partido.equipos():
+        if equipo.id != equipo_moroso.id:
+            partido.completar_pago(equipo)
+
+    partido.iniciar_segundo_tiempo()
+    return partido
+
+
+def crear_datos_prueba():
+    """Arma el torneo completo: equipos, árbitros y los 12 partidos."""
+    azar = random.Random(SEMILLA)
+    bd = BaseDatosMemoria()
+
+    bd.usuarios.append(
+        Administrador(id=1000, correo="admin@golstats.com",
+                      password_plano=PASSWORD_ADMIN)
+    )
+
+    bd.arbitros = [
+        Arbitro(1, "Carlos Mendoza", "cmendoza@golstats.com", "0991112233"),
+        Arbitro(2, "Luis Paredes", "lparedes@golstats.com", "0994445566"),
+        Arbitro(3, "Jorge Espinoza", "jespinoza@golstats.com", "0997778899"),
+    ]
+
+    _crear_equipos(bd)
+
+    hoy = datetime.now().replace(minute=0, second=0, microsecond=0)
+    enfrentamientos = _calendario(bd.equipos)
+
+    for numero, (local, visitante) in enumerate(enfrentamientos, start=1):
+        # Los 10 primeros ya se jugaron, los 2 últimos están por venir.
+        ya_se_jugo = numero <= 10
+        if ya_se_jugo:
+            fecha = hoy - timedelta(days=(11 - numero) * 3)
+        else:
+            fecha = hoy + timedelta(days=(numero - 10) * 4)
+
+        partido = Partido(
+            id=numero,
+            equipo_local=local,
+            equipo_visitante=visitante,
+            fecha_hora=fecha,
+            arbitro=bd.arbitros[numero % len(bd.arbitros)],
+        )
+
+        if numero == 7:
+            # Un walkover, para que se vea esa pantalla en el sistema.
+            _jugar_walkover(partido, azar, equipo_moroso=visitante)
+        elif ya_se_jugo:
+            _jugar_partido(partido, azar)
+        elif numero == 11:
+            # Programado y con el check-in a medio hacer, para probar que el
+            # partido no arranca hasta que estén todos.
+            partido.convocar_varios(
+                local.obtener_jugadores() + visitante.obtener_jugadores()
+            )
+            for jugador in local.obtener_jugadores()[:5]:
+                partido.registrar_checkin(jugador, CheckIn.HUELLA)
+            partido.completar_pago(local)
+        else:
+            # Programado, sin nada hecho todavía.
+            partido.convocar_varios(
+                local.obtener_jugadores() + visitante.obtener_jugadores()
+            )
+
+        bd.partidos.append(partido)
+
+    return bd
 
 
 # Instancia única que importan las rutas de Flask.
