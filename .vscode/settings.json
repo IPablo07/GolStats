@@ -1,0 +1,39 @@
+{
+  // ── Plantillas Jinja ──────────────────────────────────────────
+  // Los <script> de templates/*.html llevan sintaxis de Jinja dentro
+  // ({# comentarios #}, {% if %}), que VS Code intenta leer como
+  // JavaScript y marca como "Invalid character" o "';' expected".
+  // Son falsos positivos: Jinja resuelve todo eso al renderizar y al
+  // navegador solo le llega JavaScript valido.
+  "html.validate.scripts": false,
+
+  // ── Analisis de C/C++ ─────────────────────────────────────────
+  // GolStats es Python puro: no tiene ni un archivo .c/.cpp propio. Lo
+  // unico en C++ del workspace vive en venv/ (la dependencia `greenlet`,
+  // que arrastra SQLAlchemy) y nunca se compila aqui.
+  //
+  // Al abrir uno de esos archivos, IntelliSense intenta resolver
+  // #include <Python.h> -> #include <io.h>, e io.h pertenece al Windows
+  // SDK / MSVC. Satisfacer esa cadena obliga a instalar varios GB de
+  // herramientas de C++ que este proyecto no necesita.
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.files.exclude": {
+    "**/venv": true,
+    "**/.git": true,
+    "**/__pycache__": true
+  },
+
+  // ── Rendimiento ───────────────────────────────────────────────
+  // venv/ son miles de archivos de terceros: ni vigilarlos ni buscarlos.
+  "files.watcherExclude": {
+    "**/venv/**": true
+  },
+  "search.exclude": {
+    "**/venv": true
+  },
+
+  // El interprete del entorno virtual del proyecto, sea cual sea la
+  // carpeta donde cada uno lo tenga clonado.
+  "python.defaultInterpreterPath": "${workspaceFolder}/venv/Scripts/python.exe"
+}
