@@ -277,6 +277,35 @@ def jugador_detalle(jugador_id):
 #  Biometría: enrolamiento de jugadores, árbitros y administradores
 # ══════════════════════════════════════════════════════════════════
 
+def _jugadores_por_equipo(huellas):
+    """
+    La plantilla de cada equipo, con cuántos de sus jugadores ya tienen
+    huella.
+
+    Enrolar es una tarea que se hace equipo por equipo —llega un plantel
+    entero y se le toma la huella a todos—, así que la pantalla se ordena
+    igual. El contador por equipo es lo que deja ver de un vistazo a qué
+    plantel le falta gente sin ir fila por fila.
+
+    `huellas` es None cuando la base no respondió: ahí no se puede contar
+    nada, y `enrolados` también queda en None para que la vista lo diga en
+    vez de mostrar un cero engañoso.
+    """
+    filas = []
+    for equipo in BD.equipos:
+        jugadores = equipo.obtener_jugadores()
+        filas.append({
+            "equipo": equipo,
+            "jugadores": jugadores,
+            "total": len(jugadores),
+            "enrolados": (
+                sum(1 for j in jugadores if ("jugador", j.id) in huellas)
+                if huellas is not None else None
+            ),
+        })
+    return filas
+
+
 @app.route("/biometria")
 @admin_requerido
 def biometria_panel():
@@ -291,7 +320,7 @@ def biometria_panel():
     huellas = lector.huellas_registradas()
     return render_template(
         "biometria.html",
-        jugadores=BD.jugadores,
+        equipos=_jugadores_por_equipo(huellas),
         arbitros=BD.arbitros,
         administradores=administradores,
         huellas=huellas if huellas is not None else {},

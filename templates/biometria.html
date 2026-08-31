@@ -27,47 +27,61 @@
 </div>
 {% endif %}
 
-{% macro seccion_biometria(titulo, personas, tipo_persona, obtener_correo=None) %}
+{# Una sola definicion de fila, compartida por las tres secciones: los
+   jugadores van agrupados por equipo y los demas en lista plana, pero la
+   columna de huella y el boton de enrolar son identicos. #}
+{% macro fila_persona(persona, tipo_persona) %}
+  {# none cuando la base no respondio: no sabemos si esta enrolada #}
+  {% set registrada = ((tipo_persona, persona.id) in huellas)
+                      if base_disponible else none %}
+  <tr>
+    <td>
+      {% if persona.numero_camiseta is defined %}
+        <span class="badge text-bg-light me-1">#{{ persona.numero_camiseta }}</span>
+      {% endif %}
+      {% if persona.nombre_completo is defined %}
+        {{ persona.nombre_completo() }}
+      {% elif persona.nombres is defined %}
+        {{ persona.nombres }}
+      {% else %}
+        {{ persona.correo }}
+      {% endif %}
+    </td>
+    <td class="d-none d-md-table-cell text-body-secondary">
+      {{ persona.correo or "—" }}
+    </td>
+    <td class="text-center">{{ badge_huella(registrada) }}</td>
+    <td class="text-center">
+      <form method="post" class="form-huella d-inline"
+            action="{{ url_for('registrar_huella', tipo_persona=tipo_persona, persona_id=persona.id) }}">
+        <button type="submit" class="btn btn-sm btn-outline-success">
+          {% if registrada %}Volver a registrar{% else %}Registrar{% endif %}
+        </button>
+      </form>
+    </td>
+  </tr>
+{% endmacro %}
+
+{% macro encabezado_tabla() %}
+  <thead class="table-light">
+    <tr>
+      <th>Nombre</th>
+      <th class="d-none d-md-table-cell">Correo</th>
+      <th class="text-center">Huella</th>
+      <th class="text-center">Acción</th>
+    </tr>
+  </thead>
+{% endmacro %}
+
+{% macro seccion_biometria(titulo, personas, tipo_persona) %}
 <div class="card mb-4">
   <div class="card-header bg-white fw-semibold">{{ titulo }}</div>
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>Nombre</th>
-          <th class="d-none d-md-table-cell">Correo</th>
-          <th class="text-center">Huella</th>
-          <th class="text-center">Acción</th>
-        </tr>
-      </thead>
+      {{ encabezado_tabla() }}
       <tbody>
         {% for persona in personas %}
-        {# none cuando la base no respondio: no sabemos si esta enrolada #}
-        {% set registrada = ((tipo_persona, persona.id) in huellas)
-                            if base_disponible else none %}
-        <tr>
-          <td>
-            {% if persona.nombre_completo is defined %}
-              {{ persona.nombre_completo() }}
-            {% elif persona.nombres is defined %}
-              {{ persona.nombres }}
-            {% else %}
-              {{ persona.correo }}
-            {% endif %}
-          </td>
-          <td class="d-none d-md-table-cell text-body-secondary">
-            {{ persona.correo or "—" }}
-          </td>
-          <td class="text-center">{{ badge_huella(registrada) }}</td>
-          <td class="text-center">
-            <form method="post" class="form-huella d-inline"
-                  action="{{ url_for('registrar_huella', tipo_persona=tipo_persona, persona_id=persona.id) }}">
-              <button type="submit" class="btn btn-sm btn-outline-success">
-                {% if registrada %}Volver a registrar{% else %}Registrar{% endif %}
-              </button>
-            </form>
-          </td>
-        </tr>
+          {{ fila_persona(persona, tipo_persona) }}
         {% else %}
         <tr>
           <td colspan="4" class="text-center text-body-secondary py-3">
@@ -81,7 +95,56 @@
 </div>
 {% endmacro %}
 
-{{ seccion_biometria("Jugadores", jugadores, "jugador") }}
+{# ── Jugadores, agrupados por equipo ─────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Jugadores</span>
+    <span class="small text-body-secondary">Agrupados por equipo</span>
+  </div>
+  {% if equipos %}
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      {{ encabezado_tabla() }}
+      {% for fila in equipos %}
+      <tbody>
+        <tr class="table-secondary">
+          <th colspan="2" class="fw-semibold">
+            {{ fila.equipo.nombre }}
+            <span class="fw-normal text-body-secondary small">
+              · {{ fila.total }} jugador{{ 'es' if fila.total != 1 }}
+            </span>
+          </th>
+          <td colspan="2" class="text-center small">
+            {% if fila.enrolados is none %}
+              <span class="text-body-secondary">Sin datos de huella</span>
+            {% elif fila.enrolados == fila.total %}
+              <span class="text-success fw-semibold">Plantel completo</span>
+            {% else %}
+              {{ fila.enrolados }} de {{ fila.total }} con huella
+            {% endif %}
+          </td>
+        </tr>
+        {% for jugador in fila.jugadores %}
+          {{ fila_persona(jugador, "jugador") }}
+        {% else %}
+        <tr>
+          <td colspan="4" class="text-center text-body-secondary py-3">
+            Este equipo todavía no tiene jugadores inscritos.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-body-secondary">
+    <i class="bi bi-shield display-4 d-block mb-2 opacity-50"></i>
+    <p class="mb-0">Todavía no hay equipos registrados en el torneo.</p>
+  </div>
+  {% endif %}
+</div>
+
 {{ seccion_biometria("Árbitros", arbitros, "arbitro") }}
 {{ seccion_biometria("Administradores", administradores, "administrador") }}
 {% endblock %}
