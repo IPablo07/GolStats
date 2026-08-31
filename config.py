@@ -23,12 +23,13 @@ class Config:
     DEBUG = _bool(os.getenv("FLASK_DEBUG"), True)
 
     # ── Lector de huella SecuGen ──────────────────────────────────
-    # "secugen"  → el navegador llama al WebAPI en https://localhost:8000
-    #              (solo funciona en la laptop donde está conectado el lector)
-    # "simulado" → botón que simula la captura, para desarrollar sin lector
+    # "secugen"  → Flask captura directo del lector con el paquete
+    #              `biometria` (ctypes + sgfplib.dll). Debe correr en la
+    #              misma laptop Windows donde está conectado el lector.
+    # "simulado" → no toca hardware, para desarrollar sin lector.
     HUELLA_MODO = os.getenv("HUELLA_MODO", "simulado")
     HUELLA_UMBRAL = int(os.getenv("HUELLA_UMBRAL", "45"))
-    SECUGEN_URL = os.getenv("SECUGEN_URL", "https://localhost:8000")
+    HUELLA_LECTOR = os.getenv("HUELLA_LECTOR", "secugen:hsdu03p")
 
     # ── Correo ────────────────────────────────────────────────────
     MAIL_SERVER = os.getenv("MAIL_SERVER", "")
@@ -45,7 +46,12 @@ class Config:
     def correo_activo(cls):
         return bool(cls.MAIL_SERVER and cls.MAIL_USERNAME)
 
-    # ── Base de datos (se usa recién en la última etapa) ───────────
+    # ── Base de datos ────────────────────────────────────────────
+    # Por ahora PostgreSQL solo guarda la tabla de huellas (registros_
+    # biometricos); equipos/partidos siguen en memoria (datos_prueba.py)
+    # hasta la etapa de conexión completa que describe el README.
     DATABASE_URL = os.getenv(
         "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/golstats"
     )
+    SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    SQLALCHEMY_TRACK_MODIFICATIONS = False

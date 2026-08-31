@@ -13,6 +13,7 @@ Ejecutar:
     → http://localhost:5000
 """
 
+import atexit
 from functools import wraps
 
 from flask import (
@@ -21,7 +22,8 @@ from flask import (
 
 from config import Config
 from datos_prueba import BD
-from modelos import Partido, Tarjeta, CheckIn
+from extensiones import db
+from modelos import Partido, Tarjeta, CheckIn, RegistroBiometrico, TIPOS_PERSONA
 from servicios import estadisticas
 from servicios.correo import ServicioCorreo
 from servicios.huella import LectorHuella, ErrorHuella
@@ -29,8 +31,25 @@ from servicios.huella import LectorHuella, ErrorHuella
 app = Flask(__name__)
 app.config.from_object(Config)
 
+db.init_app(app)
+with app.app_context():
+    print("DEBUG: probando conexión...")
+
+    try:
+        db.session.execute(db.text("SELECT 1"))
+        print("DEBUG: conexión a PostgreSQL OK")
+
+        print("DEBUG: creando tablas...")
+        db.create_all()
+        print("DEBUG: tablas creadas correctamente")
+
+    except Exception as e:
+        print("ERROR:")
+        print(e)
+
 lector = LectorHuella.desde_config(Config)
 correo = ServicioCorreo(activo=Config.correo_activo())
+atexit.register(lector.cerrar)  # libera el lector al apagar el servidor
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -72,9 +91,38 @@ def variables_globales():
     return {
         "usuario": usuario_actual(),
         "modo_huella": lector.modo,
-        "url_secugen": lector.url,
         "umbral_huella": lector.umbral,
     }
+
+
+# ══════════════════════════════════════════════════════════════════
+#  Biometría: ubicar a la persona detrás de (tipo_persona, id)
+# ══════════════════════════════════════════════════════════════════
+
+def _persona_biometrica(tipo_persona, persona_id):
+    """
+    Los datos siguen en memoria (BD), pero la huella ya vive en Postgres:
+    esta función es el puente entre ambos mundos mientras dure la
+    migración. `tipo_persona` es uno de RegistroBiometrico.TIPOS_PERSONA.
+    """
+    if tipo_persona == "jugador":
+        return BD.buscar_jugador(persona_id)
+    if tipo_persona == "arbitro":
+        return next((a for a in BD.arbitros if a.id == persona_id), None)
+    if tipo_persona == "administrador":
+        usuario = BD.buscar_usuario_por_id(persona_id)
+        return usuario if usuario is not None and usuario.rol == "admin" else None
+    return None
+
+
+def _nombre_persona(persona):
+    """
+    Jugador tiene nombre_completo(), Árbitro tiene .nombres, y
+    Administrador —tal como está modelado hoy— solo tiene .correo.
+    """
+    if hasattr(persona, "nombre_completo"):
+        return persona.nombre_completo()
+    return getattr(persona, "nombres", None) or persona.correo
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -104,6 +152,38 @@ def login():
         return redirect(url_for("panel"))
 
     return render_template("login.html", correo="")
+
+
+@app.route("/login/huella", methods=["POST"])
+def login_huella():
+    """
+    Ingreso sin contraseña: solo para administradores, y solo con huella
+    ya registrada (ver /biometria). Es 1:N — no hace falta decir antes
+    quién es, el lector lo determina comparando contra todas las huellas
+    de administradores.
+    """
+    if usuario_actual() is not None:
+        return redirect(url_for("panel"))
+
+    try:
+        persona_id, coincidencia = lector.identificar("administrador")
+    except ErrorHuella as e:
+        flash(str(e), "danger")
+        return redirect(url_for("login"))
+
+    usuario = BD.buscar_usuario_por_id(persona_id)
+    if usuario is None or usuario.rol != "admin":
+        flash("La huella no corresponde a ningún administrador activo.", "danger")
+        return redirect(url_for("login"))
+
+    session["usuario_id"] = usuario.id
+    session["rol"] = usuario.rol
+    flash(
+        f"Bienvenido, {usuario.correo} (ingreso con huella, "
+        f"puntaje {coincidencia.score}).",
+        "success",
+    )
+    return redirect(url_for("panel"))
 
 
 @app.route("/logout")
@@ -188,23 +268,61 @@ def jugador_detalle(jugador_id):
         "jugador_detalle.html",
         jugador=jugador,
         resumen=estadisticas.estadisticas_jugador(jugador, BD.partidos),
-        tiene_huella=lector.tiene_huella(jugador),
+        tiene_huella=lector.tiene_huella("jugador", jugador.id),
     )
 
 
-@app.route("/jugadores/<int:jugador_id>/huella", methods=["POST"])
+# ══════════════════════════════════════════════════════════════════
+#  Biometría: enrolamiento de jugadores, árbitros y administradores
+# ══════════════════════════════════════════════════════════════════
+
+@app.route("/biometria")
 @admin_requerido
-def registrar_huella(jugador_id):
-    """Enrolamiento: se hace una sola vez por jugador."""
-    jugador = BD.buscar_jugador(jugador_id)
-    if jugador is None:
+def biometria_panel():
+    """
+    Un solo lugar para enrolar a las tres clases de persona. Cada fila que
+    se registra aquí es la que va construyendo la tabla
+    `registros_biometricos` en Postgres.
+    """
+    administradores = [u for u in BD.usuarios if u.rol == "admin"]
+    huellas = {
+        (r.tipo_persona, r.persona_id): r for r in RegistroBiometrico.query.all()
+    }
+    return render_template(
+        "biometria.html",
+        jugadores=BD.jugadores,
+        arbitros=BD.arbitros,
+        administradores=administradores,
+        huellas=huellas,
+    )
+
+
+@app.route("/biometria/<tipo_persona>/<int:persona_id>/registrar", methods=["POST"])
+@admin_requerido
+def registrar_huella(tipo_persona, persona_id):
+    """Enrolamiento: pide varias capturas y guarda la plantilla en Postgres."""
+    if tipo_persona not in TIPOS_PERSONA:
         abort(404)
+    persona = _persona_biometrica(tipo_persona, persona_id)
+    if persona is None:
+        abort(404)
+
+    nombre = _nombre_persona(persona)
     try:
-        lector.registrar_template(jugador, request.form.get("template"))
-        flash(f"Huella registrada para {jugador.nombre_completo()}.", "success")
+        lector.registrar(
+            tipo_persona,
+            persona_id,
+            nombre,
+            correo=getattr(persona, "correo", None),
+            cedula=getattr(persona, "cedula", None),
+        )
+        flash(f"Huella registrada para {nombre}.", "success")
     except ErrorHuella as e:
         flash(str(e), "danger")
-    return redirect(url_for("jugador_detalle", jugador_id=jugador.id))
+
+    if tipo_persona == "jugador":
+        return redirect(url_for("jugador_detalle", jugador_id=persona_id))
+    return redirect(url_for("biometria_panel"))
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -238,8 +356,9 @@ def partido_detalle(partido_id):
 @admin_requerido
 def checkin(partido_id):
     """
-    Check-in con huella. El navegador ya hizo la captura y el match
-    contra el template del jugador; aquí llega el puntaje.
+    Check-in con huella. El admin hace clic en "Huella" junto al jugador y
+    Flask captura directo del lector (bloquea la petición mientras tanto);
+    ya no hace falta que el navegador hable con nada aparte.
     Responde JSON con el carnet del jugador para mostrarlo en pantalla.
     """
     partido = BD.buscar_partido(partido_id)
@@ -252,8 +371,15 @@ def checkin(partido_id):
         return jsonify({"ok": False, "error": "Jugador no encontrado."}), 404
 
     try:
-        puntaje = lector.verificar(jugador, datos.get("puntaje"))
-        metodo = CheckIn.MANUAL if lector.es_simulado() else CheckIn.HUELLA
+        if lector.es_simulado():
+            puntaje = None
+            metodo = CheckIn.MANUAL
+        else:
+            veredicto = lector.verificar(
+                "jugador", jugador.id, jugador.nombre_completo()
+            )
+            puntaje = veredicto.score
+            metodo = CheckIn.HUELLA
         registro = partido.registrar_checkin(jugador, metodo)
     except (ErrorHuella, ValueError) as e:
         return jsonify({"ok": False, "error": str(e)}), 400
