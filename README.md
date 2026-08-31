@@ -42,6 +42,8 @@ GolStats/
 ├── datos_prueba.py         Datos de ejemplo en memoria + repositorio BD
 ├── prueba_modelos.py       Prueba de las clases del dominio (sin Flask)
 ├── prueba_rutas.py         Recorre todas las pantallas con el test client
+├── docs/
+│   └── diagrama-clases.md  Diagrama de clases y decisiones de diseño
 ├── modelos/                Clases del dominio (POO)
 │   ├── usuario.py          Usuario → Administrador, Jugador
 │   ├── equipo.py           Equipo (encapsula su plantilla)
