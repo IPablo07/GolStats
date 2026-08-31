@@ -216,16 +216,29 @@ classDiagram
     class LectorHuella {
         +str modo
         +int umbral
-        +str url
+        +str lector_modelo
         +desde_config(config) LectorHuella
         +es_simulado() bool
-        +registrar_template(jugador, template) str
-        +tiene_huella(jugador) bool
-        +verificar(jugador, puntaje) int
+        +tiene_huella(tipo_persona, persona_id) bool
+        +registrar(tipo_persona, persona_id, nombre_completo, correo, cedula) RegistroBiometrico
+        +verificar(tipo_persona, persona_id, nombre_visible) Veredicto
+        +identificar(tipo_persona) tuple
+        +cerrar()
     }
 
     class ErrorHuella {
         <<Exception>>
+    }
+
+    class RegistroBiometrico {
+        +int persona_id
+        +str tipo_persona
+        +str nombre_completo
+        +bytes plantilla
+        +int dedo
+        +int calidad
+        +referencia_para(tipo_persona, persona_id)$ str
+        +a_plantilla() Plantilla
     }
 
     class ServicioCorreo {
@@ -251,8 +264,19 @@ classDiagram
     }
 
     LectorHuella ..> ErrorHuella : lanza
+    LectorHuella ..> RegistroBiometrico : persiste en PostgreSQL
     ServicioCorreo ..> Notificacion : envia
 ```
+
+`LectorHuella` es la fachada del subsistema biométrico: internamente usa el
+paquete `biometria` (ctypes + `sgfplib.dll`) para hablar directo con el lector
+SecuGen desde el propio proceso de Flask — ya no hace falta un servicio de
+navegador aparte en `https://localhost:8000`. Cada `registrar()` exitoso deja
+una fila en la tabla `registros_biometricos` (Postgres), identificada por
+`(tipo_persona, persona_id)`; por eso la base de datos biométrica se va
+construyendo sola a medida que se enrola a cada jugador, árbitro o
+administrador, sin esperar a que el resto del esquema (equipos, partidos)
+esté conectado.
 
 ---
 
