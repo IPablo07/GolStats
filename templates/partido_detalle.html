@@ -76,13 +76,16 @@
         Iniciar segundo tiempo
       </button>
     </form>
-    <form method="post" action="{{ url_for('cambiar_estado', partido_id=partido.id) }}">
+
+    {# Punto 7: ya no se envía directo, primero pide confirmación #}
+    <form method="post" id="form-finalizar" action="{{ url_for('cambiar_estado', partido_id=partido.id) }}">
       <input type="hidden" name="accion" value="finalizar">
-      <button class="btn btn-dark btn-sm"
-              {% if partido.estado != 'segundo_tiempo' %}disabled{% endif %}>
-        Finalizar partido
-      </button>
     </form>
+    <button type="button" class="btn btn-dark btn-sm"
+            data-bs-toggle="modal" data-bs-target="#modal-confirmar-finalizar"
+            {% if partido.estado != 'segundo_tiempo' %}disabled{% endif %}>
+      Finalizar partido
+    </button>
   </div>
   {% endif %}
 </div>
@@ -106,10 +109,17 @@
           </div>
           {% if es_admin and not pago.esta_pagado() and not partido.esta_cerrado() %}
           <div class="d-flex gap-2 mt-2">
-            <form method="post" action="{{ url_for('registrar_pago', partido_id=partido.id) }}">
+            {# Punto 7: confirmación antes de registrar el pago #}
+            <form method="post" id="form-pago-{{ pago.equipo.id }}"
+                  action="{{ url_for('registrar_pago', partido_id=partido.id) }}">
               <input type="hidden" name="equipo_id" value="{{ pago.equipo.id }}">
-              <button class="btn btn-sm btn-success">Registrar pago</button>
             </form>
+            <button type="button" class="btn btn-sm btn-success"
+                    data-bs-toggle="modal" data-bs-target="#modal-confirmar-pago"
+                    data-form-id="form-pago-{{ pago.equipo.id }}"
+                    data-equipo="{{ pago.equipo.nombre }}">
+              Registrar pago
+            </button>
             <form method="post" action="{{ url_for('recordar_pago', partido_id=partido.id) }}">
               <input type="hidden" name="equipo_id" value="{{ pago.equipo.id }}">
               <button class="btn btn-sm btn-outline-secondary">Recordar</button>
@@ -168,7 +178,10 @@
           {% endfor %}
         </div>
         {% else %}
-        <p class="text-body-secondary mb-0">Este partido no tiene convocados.</p>
+        <div class="text-center py-4 text-body-secondary">
+          <i class="bi bi-person-x display-4 d-block mb-2 opacity-50"></i>
+          <p class="mb-0">Este partido todavía no tiene jugadores convocados.</p>
+        </div>
         {% endif %}
       </div>
     </div>
@@ -180,8 +193,9 @@
     <div class="card h-100">
       <div class="card-header bg-white fw-semibold">Registrar gol</div>
       <div class="card-body">
+        {# Punto 6: validación en el cliente #}
         <form method="post" action="{{ url_for('registrar_gol', partido_id=partido.id) }}"
-              class="row g-2">
+              class="row g-2 needs-validation" novalidate>
           <div class="col-12">
             <label class="form-label small">Jugador</label>
             <select name="jugador_id" class="form-select" required>
@@ -196,6 +210,7 @@
               </optgroup>
               {% endfor %}
             </select>
+            <div class="invalid-feedback">Selecciona quién anotó el gol.</div>
           </div>
           <div class="col-12">
             <label class="form-label small">Asistencia (opcional)</label>
@@ -215,6 +230,7 @@
           <div class="col-6">
             <label class="form-label small">Minuto</label>
             <input type="number" name="minuto" class="form-control" min="1" max="120" required>
+            <div class="invalid-feedback">Ingresa un minuto entre 1 y 120.</div>
           </div>
           <div class="col-6 d-flex align-items-end">
             <button class="btn btn-success w-100">Registrar gol</button>
@@ -228,8 +244,9 @@
     <div class="card h-100">
       <div class="card-header bg-white fw-semibold">Registrar tarjeta</div>
       <div class="card-body">
+        {# Punto 6: validación en el cliente #}
         <form method="post" action="{{ url_for('registrar_tarjeta', partido_id=partido.id) }}"
-              class="row g-2">
+              class="row g-2 needs-validation" novalidate>
           <div class="col-12">
             <label class="form-label small">Jugador</label>
             <select name="jugador_id" class="form-select" required>
@@ -244,6 +261,7 @@
               </optgroup>
               {% endfor %}
             </select>
+            <div class="invalid-feedback">Selecciona el jugador sancionado.</div>
           </div>
           <div class="col-6">
             <label class="form-label small">Tipo</label>
@@ -255,6 +273,7 @@
           <div class="col-6">
             <label class="form-label small">Minuto</label>
             <input type="number" name="minuto" class="form-control" min="1" max="120" required>
+            <div class="invalid-feedback">Ingresa un minuto entre 1 y 120.</div>
           </div>
           <div class="col-12">
             <button class="btn btn-warning w-100">Registrar tarjeta</button>
@@ -282,7 +301,12 @@
           <span class="ms-auto small text-body-secondary">{{ evento.equipo.nombre }}</span>
         </li>
         {% else %}
-        <li class="list-group-item text-body-secondary">Sin eventos registrados.</li>
+        <li class="list-group-item">
+          <div class="text-center py-4 text-body-secondary">
+            <i class="bi bi-clock-history display-4 d-block mb-2 opacity-50"></i>
+            <p class="mb-0">Todavía no hay goles ni tarjetas en este partido.</p>
+          </div>
+        </li>
         {% endfor %}
       </ul>
     </div>
@@ -314,9 +338,101 @@
     </div>
   </div>
 </div>
+
+{# ── Punto 7: modal de confirmación para finalizar partido ───── #}
+<div class="modal fade" id="modal-confirmar-finalizar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">¿Finalizar el partido?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        Esta acción cierra el partido y ya no se podrán registrar más goles ni
+        tarjetas. No se puede deshacer.
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-dark" id="btn-confirmar-finalizar" data-bs-dismiss="modal">
+          Sí, finalizar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Punto 7: modal de confirmación para registrar pago ──────── #}
+<div class="modal fade" id="modal-confirmar-pago" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">¿Registrar pago?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        Vas a marcar como pagada la vocalía de
+        <strong id="nombre-equipo-pago"></strong>. Verifica que el monto se
+        haya recibido antes de confirmar.
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-success" id="btn-confirmar-pago" data-bs-dismiss="modal">
+          Sí, registrar pago
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
+{# Punto 6: activa la validación de Bootstrap en todos los formularios de esta pantalla #}
+<script>
+  (function () {
+    'use strict';
+    document.querySelectorAll('.needs-validation').forEach((form) => {
+      form.addEventListener('submit', (event) => {
+        if (!form.checkValidity()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+      }, false);
+    });
+  })();
+</script>
+
+{# Punto 7: conecta los modales de confirmación con sus formularios reales #}
+<script>
+  (function () {
+    'use strict';
+
+    const btnFinalizar = document.getElementById('btn-confirmar-finalizar');
+    if (btnFinalizar) {
+      btnFinalizar.addEventListener('click', () => {
+        document.getElementById('form-finalizar').submit();
+      });
+    }
+
+    const modalPago = document.getElementById('modal-confirmar-pago');
+    if (modalPago) {
+      let formPagoActivoId = null;
+
+      modalPago.addEventListener('show.bs.modal', (event) => {
+        const boton = event.relatedTarget;
+        formPagoActivoId = boton.dataset.formId;
+        document.getElementById('nombre-equipo-pago').textContent = boton.dataset.equipo;
+      });
+
+      document.getElementById('btn-confirmar-pago').addEventListener('click', () => {
+        if (formPagoActivoId) {
+          document.getElementById(formPagoActivoId).submit();
+        }
+      });
+    }
+  })();
+</script>
+
 {% if usuario.rol == 'admin' and partido.estado == 'programado' %}
 <script src="{{ url_for('static', filename='js/huella.js') }}"></script>
 <script>

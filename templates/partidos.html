@@ -16,7 +16,12 @@
         {% for partido in partidos %}
           {{ fila_partido(partido) }}
         {% else %}
-        <tr><td colspan="4" class="text-body-secondary">No hay partidos cargados.</td></tr>
+        <tr><td colspan="4">
+          <div class="text-center py-5 text-body-secondary">
+            <i class="bi bi-calendar-x display-4 d-block mb-2 opacity-50"></i>
+            <p class="mb-0">No hay partidos cargados todavía.</p>
+          </div>
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>

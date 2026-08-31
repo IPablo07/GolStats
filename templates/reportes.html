@@ -41,7 +41,12 @@
             <td class="text-center fw-bold">{{ f.goles }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="4" class="text-body-secondary">Sin goles registrados.</td></tr>
+          <tr><td colspan="4">
+            <div class="text-center py-4 text-body-secondary">
+              <i class="bi bi-dribbble display-6 d-block mb-2 opacity-50"></i>
+              <p class="mb-0">Todavía no se registran goles en el torneo.</p>
+            </div>
+          </td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -66,7 +71,12 @@
             <td class="text-center fw-bold">{{ f.asistencias }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="4" class="text-body-secondary">Sin asistencias registradas.</td></tr>
+          <tr><td colspan="4">
+            <div class="text-center py-4 text-body-secondary">
+              <i class="bi bi-arrow-through-heart display-6 d-block mb-2 opacity-50"></i>
+              <p class="mb-0">Todavía no se registran asistencias en el torneo.</p>
+            </div>
+          </td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -91,7 +101,12 @@
             <td class="text-center">{{ f.rojas }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="4" class="text-body-secondary">Sin tarjetas registradas.</td></tr>
+          <tr><td colspan="4">
+            <div class="text-center py-4 text-body-secondary">
+              <i class="bi bi-flag display-6 d-block mb-2 opacity-50"></i>
+              <p class="mb-0">No se han registrado tarjetas en el torneo.</p>
+            </div>
+          </td></tr>
           {% endfor %}
         </tbody>
       </table>

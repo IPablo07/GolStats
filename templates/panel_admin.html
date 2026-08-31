@@ -69,7 +69,10 @@
           </table>
         </div>
         {% else %}
-        <p class="p-3 mb-0 text-body-secondary">No hay partidos programados.</p>
+        <div class="text-center py-5 text-body-secondary">
+          <i class="bi bi-calendar-check display-4 d-block mb-2 opacity-50"></i>
+          <p class="mb-0">No hay partidos programados por ahora.</p>
+        </div>
         {% endif %}
       </div>
     </div>
@@ -98,7 +101,12 @@
           <span class="badge text-bg-success rounded-pill">{{ f.goles }}</span>
         </li>
         {% else %}
-        <li class="list-group-item text-body-secondary">Todavía no hay goles registrados.</li>
+        <li class="list-group-item">
+          <div class="text-center py-4 text-body-secondary">
+            <i class="bi bi-dribbble display-6 d-block mb-2 opacity-50"></i>
+            <p class="mb-0 small">Todavía no hay goles registrados.</p>
+          </div>
+        </li>
         {% endfor %}
       </ul>
     </div>
@@ -114,7 +122,12 @@
           <div>{{ m.asunto }}</div>
         </li>
         {% else %}
-        <li class="list-group-item text-body-secondary">Sin correos por ahora.</li>
+        <li class="list-group-item">
+          <div class="text-center py-4 text-body-secondary">
+            <i class="bi bi-envelope display-6 d-block mb-2 opacity-50"></i>
+            <p class="mb-0 small">Sin correos por ahora.</p>
+          </div>
+        </li>
         {% endfor %}
       </ul>
     </div>

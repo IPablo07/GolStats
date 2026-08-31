@@ -70,8 +70,11 @@
               <td class="text-center">{{ badge_estado(p.estado) }}</td>
             </tr>
             {% else %}
-            <tr><td colspan="4" class="text-body-secondary">
-              Todavía no ha sido convocado a ningún partido.
+            <tr><td colspan="4">
+              <div class="text-center py-5 text-body-secondary">
+                <i class="bi bi-person-check display-4 d-block mb-2 opacity-50"></i>
+                <p class="mb-0">Todavía no has sido convocado a ningún partido.</p>
+              </div>
             </td></tr>
             {% endfor %}
           </tbody>

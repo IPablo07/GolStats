@@ -33,6 +33,7 @@
       <div class="card-header bg-white fw-semibold">
         Plantilla ({{ equipo.cantidad_jugadores() }})
       </div>
+      {% if datos.jugadores %}
       <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
           <thead class="table-light">
@@ -63,6 +64,12 @@
           </tbody>
         </table>
       </div>
+      {% else %}
+      <div class="text-center py-5 text-body-secondary">
+        <i class="bi bi-person-badge display-4 d-block mb-2 opacity-50"></i>
+        <p class="mb-0">Este equipo todavía no tiene jugadores inscritos.</p>
+      </div>
+      {% endif %}
     </div>
   </div>
 
@@ -84,7 +91,12 @@
           </div>
         </li>
         {% else %}
-        <li class="list-group-item text-body-secondary">Sin partidos.</li>
+        <li class="list-group-item">
+          <div class="text-center py-4 text-body-secondary">
+            <i class="bi bi-calendar-x display-6 d-block mb-2 opacity-50"></i>
+            <p class="mb-0 small">Este equipo aún no tiene partidos programados.</p>
+          </div>
+        </li>
         {% endfor %}
       </ul>
     </div>
