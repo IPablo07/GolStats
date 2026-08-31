@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}Error {{ codigo }} · GolStats{% endblock %}
+
+{% block contenido %}
+<div class="text-center py-5">
+  <div class="display-1 fw-bold text-success">{{ codigo }}</div>
+  <p class="lead">{{ mensaje }}</p>
+  <a href="{{ url_for('panel') }}" class="btn btn-success mt-2">Volver al inicio</a>
+</div>
+{% endblock %}

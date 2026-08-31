@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block titulo %}{{ jugador.nombre_completo() }} · GolStats{% endblock %}
+
+{% block contenido %}
+<div class="row g-4">
+
+  <div class="col-12 col-md-5 col-lg-4">
+    <div class="card carnet shadow-sm">
+      <div class="card-header bg-success text-white fw-semibold">Carnet del jugador</div>
+      <div class="card-body text-center">
+        <div class="carnet-foto mx-auto mb-3">{{ jugador.numero_camiseta }}</div>
+        <h1 class="h5 fw-bold mb-1">{{ jugador.nombre_completo() }}</h1>
+        <p class="text-body-secondary mb-2">{{ jugador.equipo.nombre }}</p>
+        <dl class="row small mb-0 text-start">
+          <dt class="col-5">Cédula</dt><dd class="col-7">{{ jugador.cedula }}</dd>
+          <dt class="col-5">Camiseta</dt><dd class="col-7">#{{ jugador.numero_camiseta }}</dd>
+          <dt class="col-5">Correo</dt><dd class="col-7 text-break">{{ jugador.correo }}</dd>
+          <dt class="col-5">Huella</dt>
+          <dd class="col-7">
+            {% if tiene_huella %}
+              <span class="badge text-bg-success">Registrada</span>
+            {% else %}
+              <span class="badge text-bg-warning">Sin registrar</span>
+            {% endif %}
+          </dd>
+        </dl>
+      </div>
+
+      {% if usuario.rol == 'admin' %}
+      <div class="card-footer bg-white">
+        <form method="post" id="form-huella"
+              action="{{ url_for('registrar_huella', jugador_id=jugador.id) }}">
+          <input type="hidden" name="template" id="template-huella">
+          <button type="submit" class="btn btn-outline-success w-100" id="btn-enrolar">
+            {% if tiene_huella %}Volver a registrar huella{% else %}Registrar huella{% endif %}
+          </button>
+        </form>
+        <p class="small text-body-secondary mt-2 mb-0">
+          Modo del lector: <strong>{{ modo_huella }}</strong>
+        </p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-12 col-md-7 col-lg-8">
+    <div class="card">
+      <div class="card-header bg-white fw-semibold">Estadísticas</div>
+      <div class="card-body">
+        <div class="row g-3 text-center">
+          <div class="col-6 col-lg-3">
+            <div class="h3 fw-bold mb-0">{{ resumen.partidos_jugados }}</div>
+            <div class="small text-body-secondary">Partidos</div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="h3 fw-bold text-success mb-0">{{ resumen.goles }}</div>
+            <div class="small text-body-secondary">Goles</div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="h3 fw-bold text-primary mb-0">{{ resumen.asistencias }}</div>
+            <div class="small text-body-secondary">Asistencias</div>
+          </div>
+          <div class="col-6 col-lg-3">
+            <div class="h3 fw-bold mb-0">
+              <span class="text-warning">{{ resumen.amarillas }}</span> /
+              <span class="text-danger">{{ resumen.rojas }}</span>
+            </div>
+            <div class="small text-body-secondary">Tarjetas</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if usuario.rol == 'admin' %}
+<script src="{{ url_for('static', filename='js/huella.js') }}"></script>
+<script>
+  const lector = new LectorHuella({
+    modo: "{{ modo_huella }}",
+    url: "{{ url_secugen }}",
+    umbral: {{ umbral_huella }}
+  });
+
+  document.getElementById("form-huella").addEventListener("submit", async (evento) => {
+    const campo = document.getElementById("template-huella");
+    if (campo.value) return;                 // ya se capturó, deja pasar el envío
+    evento.preventDefault();
+
+    const boton = document.getElementById("btn-enrolar");
+    boton.disabled = true;
+    boton.textContent = "Coloque el dedo en el lector...";
+    try {
+      campo.value = await lector.capturar();
+      evento.target.submit();
+    } catch (error) {
+      alert(error.message);
+      boton.disabled = false;
+      boton.textContent = "Registrar huella";
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+/* Estilos propios de GolStats — el resto lo pone Bootstrap 5 */
+
+body {
+  min-height: 100vh;
+}
+
+.card {
+  border: 1px solid rgba(0, 0, 0, .075);
+  border-radius: .75rem;
+}
+
+.card-header {
+  border-bottom: 1px solid rgba(0, 0, 0, .06);
+  border-radius: .75rem .75rem 0 0 !important;
+}
+
+/* Número grande del carnet del jugador */
+.carnet-foto {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #198754, #146c43);
+  color: #fff;
+  font-size: 2.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carnet {
+  border: 2px solid #198754;
+}
+
+/* En pantallas chicas las tablas se desplazan en vez de romper el layout */
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 575.98px) {
+  .display-6 {
+    font-size: 1.75rem;
+  }
+}
