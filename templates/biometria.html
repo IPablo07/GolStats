@@ -18,6 +18,15 @@
   administradores con huella enrolada.
 </p>
 
+{% if not base_disponible %}
+<div class="alert alert-warning">
+  <strong>No se pudo consultar la base de huellas.</strong>
+  La columna «Huella» no puede decir quién está enrolado y quién no.
+  Revise <code>DATABASE_URL</code> en el archivo <code>.env</code> y que
+  PostgreSQL esté levantado. El resto del sistema funciona igual.
+</div>
+{% endif %}
+
 {% macro seccion_biometria(titulo, personas, tipo_persona, obtener_correo=None) %}
 <div class="card mb-4">
   <div class="card-header bg-white fw-semibold">{{ titulo }}</div>
@@ -33,7 +42,9 @@
       </thead>
       <tbody>
         {% for persona in personas %}
-        {% set registrada = (tipo_persona, persona.id) in huellas %}
+        {# none cuando la base no respondio: no sabemos si esta enrolada #}
+        {% set registrada = ((tipo_persona, persona.id) in huellas)
+                            if base_disponible else none %}
         <tr>
           <td>
             {% if persona.nombre_completo is defined %}

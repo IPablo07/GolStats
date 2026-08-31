@@ -15,6 +15,7 @@ Cada uno define su propio descripcion() — polimorfismo.
 """
 
 from datetime import datetime
+from math import ceil
 
 from modelos.pago import PagoVocalia
 
@@ -141,6 +142,10 @@ class Partido:
 
     MONTO_VOCALIA = 20.00
 
+    # Duracion reglamentaria. El cronometro no pasa de aqui: al llegar a
+    # 90' se queda clavado y espera a que el admin finalice el partido.
+    MINUTOS_REGLAMENTARIOS = 90
+
     def __init__(self, id, equipo_local, equipo_visitante, fecha_hora, arbitro=None,
                  monto_vocalia=MONTO_VOCALIA):
         if equipo_local.id == equipo_visitante.id:
@@ -163,6 +168,11 @@ class Partido:
         self._checkins = []
         self._goles = []
         self._tarjetas = []
+
+        # Cronómetro del partido (ver la sección "Cronómetro" más abajo).
+        # Solo corre durante los dos tiempos: el medio tiempo lo pausa.
+        self._segundos_jugados = 0.0
+        self._reloj_desde = None
 
         # Un pago de vocalía por equipo
         self._pagos = {
@@ -202,6 +212,93 @@ class Partido:
                 f"{jugador.nombre_completo()} no pertenece a ninguno de los dos "
                 f"equipos de este partido"
             )
+
+    # ── Cronómetro ────────────────────────────────────────────────
+    #
+    # Funciona como el reloj de un partido real, pero el que manda es el
+    # administrador, no un temporizador automático: el reloj arranca,
+    # se pausa y se reanuda enganchado a las transiciones de estado que
+    # él dispara desde la vocalía.
+    #
+    #     iniciar_primer_tiempo()   → arranca
+    #     terminar_primer_tiempo()  → pausa   (medio tiempo, sin límite)
+    #     iniciar_segundo_tiempo()  → reanuda desde donde quedó
+    #     finalizar() / walkover    → detiene
+    #
+    # No se guarda "el minuto" como un número que alguien incrementa:
+    # se guardan los segundos ya acumulados más el instante en que
+    # arrancó el tramo actual, y el minuto se calcula al consultarlo.
+    # Así el reloj sigue avanzando aunque nadie tenga la página abierta,
+    # y dos pantallas distintas nunca muestran minutos distintos.
+
+    def _arrancar_reloj(self):
+        if self._reloj_desde is None:
+            self._reloj_desde = datetime.now()
+
+    def _pausar_reloj(self):
+        """Acumula lo corrido en este tramo y deja el reloj detenido."""
+        if self._reloj_desde is not None:
+            self._segundos_jugados += (
+                datetime.now() - self._reloj_desde
+            ).total_seconds()
+            self._reloj_desde = None
+
+    def reloj_corriendo(self):
+        return self._reloj_desde is not None
+
+    def segundos_jugados(self):
+        """Segundos de juego efectivo, sin contar el medio tiempo."""
+        segundos = self._segundos_jugados
+        if self._reloj_desde is not None:
+            segundos += (datetime.now() - self._reloj_desde).total_seconds()
+        return min(segundos, Partido.MINUTOS_REGLAMENTARIOS * 60)
+
+    def minuto_actual(self):
+        """
+        El minuto que se muestra en pantalla, como en la transmisión de un
+        partido. Devuelve 0 si el partido todavía no arrancó, y nunca pasa
+        de los 90.
+
+        Con el reloj corriendo se muestra el minuto que se está jugando
+        (apenas se pita el inicio ya va el 1). Con el reloj en pausa se
+        muestra el último minuto cumplido: al irse al descanso después de
+        45 minutos el tablero dice 45', no 46'.
+        """
+        segundos = self.segundos_jugados()
+        if not self.reloj_corriendo():
+            if segundos == 0:
+                return 0
+            minuto = max(1, ceil(segundos / 60))
+        else:
+            minuto = int(segundos // 60) + 1
+        return min(minuto, Partido.MINUTOS_REGLAMENTARIOS)
+
+    def tiempo_cumplido(self):
+        """True cuando ya se llegó a los 90 minutos reglamentarios."""
+        return self.segundos_jugados() >= Partido.MINUTOS_REGLAMENTARIOS * 60
+
+    def fase_reloj(self):
+        """Nombre legible de la fase en la que está el partido ahora."""
+        return {
+            Partido.PROGRAMADO: "Sin iniciar",
+            Partido.PRIMER_TIEMPO: "Primer tiempo",
+            Partido.MEDIO_TIEMPO: "Medio tiempo",
+            Partido.SEGUNDO_TIEMPO: "Segundo tiempo",
+            Partido.FINALIZADO: "Finalizado",
+            Partido.WALKOVER: "Walkover",
+        }[self._estado]
+
+    def cronometro(self):
+        """Todo lo que necesita la pantalla del admin, en un solo dict."""
+        return {
+            "estado": self._estado,
+            "fase": self.fase_reloj(),
+            "minuto": self.minuto_actual(),
+            "segundos": int(self.segundos_jugados()),
+            "corriendo": self.reloj_corriendo(),
+            "cumplido": self.tiempo_cumplido(),
+            "minutos_reglamentarios": Partido.MINUTOS_REGLAMENTARIOS,
+        }
 
     # ── Convocatoria ──────────────────────────────────────────────
 
@@ -321,6 +418,7 @@ class Partido:
             )
 
         self._estado = Partido.PRIMER_TIEMPO
+        self._arrancar_reloj()
         return self._estado
 
     def terminar_primer_tiempo(self):
@@ -332,6 +430,7 @@ class Partido:
         """
         if self._estado != Partido.PRIMER_TIEMPO:
             raise ValueError("Solo se puede ir al medio tiempo desde el primer tiempo")
+        self._pausar_reloj()
         self._estado = Partido.MEDIO_TIEMPO
         return self._estado
 
@@ -361,9 +460,11 @@ class Partido:
             )
 
         self._estado = Partido.SEGUNDO_TIEMPO
+        self._arrancar_reloj()
         return self._estado
 
     def _declarar_walkover(self, ganador, motivo):
+        self._pausar_reloj()
         self._estado = Partido.WALKOVER
         self.equipo_ganador = ganador
         self.motivo_walkover = motivo
@@ -380,6 +481,7 @@ class Partido:
             raise ValueError(
                 f"No se puede finalizar un partido en estado {self._estado}"
             )
+        self._pausar_reloj()
         self._estado = Partido.FINALIZADO
         if self.goles_local > self.goles_visitante:
             self.equipo_ganador = self.equipo_local

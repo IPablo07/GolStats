@@ -54,7 +54,44 @@
   </div>
 
   {% if es_admin and not partido.esta_cerrado() %}
-  <div class="card-footer bg-white d-flex flex-wrap gap-2 justify-content-center">
+  <div class="card-footer bg-white">
+
+    {# ── Cronómetro del partido ───────────────────────────────────
+       Reloj de partido real, pero manejado por el admin: arranca con
+       "Iniciar primer tiempo", se pausa en el medio tiempo y se reanuda
+       con el segundo tiempo, hasta los 90'. El tiempo lo lleva el
+       servidor (Partido.cronometro()); acá solo se muestra. #}
+    {% set crono = partido.cronometro() %}
+    <div class="d-flex flex-wrap align-items-center justify-content-center gap-4 mb-3"
+         id="cronometro"
+         data-url="{{ url_for('cronometro', partido_id=partido.id) }}"
+         data-segundos="{{ crono.segundos }}"
+         data-corriendo="{{ 1 if crono.corriendo else 0 }}"
+         data-tope="{{ crono.minutos_reglamentarios }}">
+      <div class="text-center">
+        <div class="display-6 fw-bold lh-1 font-monospace" id="cronometro-minuto">
+          {{ crono.minuto }}'
+        </div>
+        <div class="small text-body-secondary" id="cronometro-reloj">00:00</div>
+      </div>
+      <div class="text-center">
+        <span class="badge text-bg-secondary" id="cronometro-fase">
+          {{ crono.fase }}
+        </span>
+        <div class="small text-body-secondary mt-1" id="cronometro-nota"></div>
+      </div>
+      <div class="flex-grow-1" style="min-width: 12rem; max-width: 24rem;">
+        <div class="progress" style="height: .5rem;">
+          <div class="progress-bar bg-success" id="cronometro-barra"
+               style="width: 0%;"></div>
+        </div>
+        <div class="d-flex justify-content-between small text-body-secondary mt-1">
+          <span>0'</span><span>45'</span><span>90'</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 justify-content-center">
     <form method="post" action="{{ url_for('cambiar_estado', partido_id=partido.id) }}">
       <input type="hidden" name="accion" value="iniciar">
       <button class="btn btn-success btn-sm"
@@ -86,6 +123,7 @@
             {% if partido.estado != 'segundo_tiempo' %}disabled{% endif %}>
       Finalizar partido
     </button>
+    </div>
   </div>
   {% endif %}
 </div>
@@ -431,6 +469,104 @@
     }
   })();
 </script>
+
+{% if usuario.rol == 'admin' and not partido.esta_cerrado() %}
+<script>
+  {# El reloj lo lleva el servidor. Acá se hace las dos cosas a la vez:
+     se avanza un segundo localmente para que el número se mueva solo, y
+     cada 10 segundos se vuelve a preguntar al servidor para corregir
+     cualquier desfase (recargas, pestañas abiertas hace rato, otra
+     máquina mirando la misma vocalía). #}
+  (function () {
+    'use strict';
+
+    const caja = document.getElementById('cronometro');
+    if (!caja) return;
+
+    const elMinuto = document.getElementById('cronometro-minuto');
+    const elReloj = document.getElementById('cronometro-reloj');
+    const elFase = document.getElementById('cronometro-fase');
+    const elNota = document.getElementById('cronometro-nota');
+    const elBarra = document.getElementById('cronometro-barra');
+
+    const TOPE_MIN = parseInt(caja.dataset.tope, 10);
+    const COLOR_FASE = {
+      programado: 'text-bg-secondary',
+      primer_tiempo: 'text-bg-success',
+      medio_tiempo: 'text-bg-warning',
+      segundo_tiempo: 'text-bg-success',
+      finalizado: 'text-bg-dark',
+      walkover: 'text-bg-danger'
+    };
+
+    let segundos = parseInt(caja.dataset.segundos, 10);
+    let corriendo = caja.dataset.corriendo === '1';
+    let fase = {{ partido.fase_reloj()|tojson }};
+    let estado = {{ partido.estado|tojson }};
+
+    // Mismo criterio que Partido.minuto_actual(): corriendo se muestra el
+    // minuto en curso, en pausa el último cumplido, y nunca más del tope.
+    function minutoDe(seg) {
+      let minuto;
+      if (!corriendo) {
+        if (seg === 0) return 0;
+        minuto = Math.max(1, Math.ceil(seg / 60));
+      } else {
+        minuto = Math.floor(seg / 60) + 1;
+      }
+      return Math.min(TOPE_MIN, minuto);
+    }
+
+    function dosDigitos(n) {
+      return String(n).padStart(2, '0');
+    }
+
+    function pintar() {
+      const minuto = minutoDe(segundos);
+      elMinuto.textContent = minuto + "'";
+      elReloj.textContent =
+        dosDigitos(Math.floor(segundos / 60)) + ':' + dosDigitos(segundos % 60);
+      elFase.textContent = fase;
+      elFase.className = 'badge ' + (COLOR_FASE[estado] || 'text-bg-secondary');
+      elBarra.style.width = Math.min(100, (segundos / (TOPE_MIN * 60)) * 100) + '%';
+
+      if (segundos >= TOPE_MIN * 60) {
+        elNota.textContent = 'Se cumplieron los ' + TOPE_MIN + ' minutos';
+      } else if (estado === 'medio_tiempo') {
+        elNota.textContent = 'En pausa — reanude con el segundo tiempo';
+      } else if (corriendo) {
+        elNota.textContent = 'En curso';
+      } else {
+        elNota.textContent = 'Detenido';
+      }
+    }
+
+    async function resincronizar() {
+      try {
+        const respuesta = await fetch(caja.dataset.url);
+        if (!respuesta.ok) return;
+        const datos = await respuesta.json();
+        segundos = datos.segundos;
+        corriendo = datos.corriendo;
+        fase = datos.fase;
+        estado = datos.estado;
+        pintar();
+      } catch (error) {
+        // Sin red no pasa nada: el reloj local sigue corriendo solo.
+      }
+    }
+
+    pintar();
+    setInterval(() => {
+      if (corriendo && segundos < TOPE_MIN * 60) {
+        segundos += 1;
+        pintar();
+      }
+    }, 1000);
+    setInterval(resincronizar, 10000);
+  })();
+</script>
+{% endif %}
 
 {% if usuario.rol == 'admin' and partido.estado == 'programado' %}
 <script>

@@ -14,8 +14,15 @@
   </span>
 {% endmacro %}
 
+{# `tiene` es de tres estados: true / false / none.
+   none significa que no se pudo consultar la base de huellas, que no es
+   lo mismo que "no tiene huella". #}
 {% macro badge_huella(tiene) %}
-  {% if tiene %}
+  {% if tiene is none %}
+    <span class="badge text-bg-secondary" title="No se pudo consultar la base de huellas">
+      No disponible
+    </span>
+  {% elif tiene %}
     <span class="badge text-bg-success">Registrada</span>
   {% else %}
     <span class="badge text-bg-warning">Sin registrar</span>

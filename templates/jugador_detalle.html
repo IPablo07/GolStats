@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import badge_huella %}
 {% block titulo %}{{ jugador.nombre_completo() }} · GolStats{% endblock %}
 
 {% block contenido %}
@@ -16,13 +17,7 @@
           <dt class="col-5">Camiseta</dt><dd class="col-7">#{{ jugador.numero_camiseta }}</dd>
           <dt class="col-5">Correo</dt><dd class="col-7 text-break">{{ jugador.correo }}</dd>
           <dt class="col-5">Huella</dt>
-          <dd class="col-7">
-            {% if tiene_huella %}
-              <span class="badge text-bg-success">Registrada</span>
-            {% else %}
-              <span class="badge text-bg-warning">Sin registrar</span>
-            {% endif %}
-          </dd>
+          <dd class="col-7">{{ badge_huella(tiene_huella) }}</dd>
         </dl>
       </div>
 

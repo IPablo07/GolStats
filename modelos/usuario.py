@@ -1,17 +1,29 @@
 """
 modelos/usuario.py
 ───────────────────
-Jerarquía de usuarios: clase base + dos subclases (admin/jugador).
+Jerarquía de usuarios del sistema: clase base + dos subclases
+(administrador / cuenta compartida de jugadores).
+
+Ojo con la diferencia entre *usuario* y *jugador*:
+
+    Usuario  → alguien que entra al sistema (tiene correo y contraseña)
+    Jugador  → una persona de la plantilla de un equipo
+
+Antes cada jugador era además un usuario, con su propia cuenta. Ya no:
+ahora existe UNA SOLA cuenta compartida para todos los jugadores
+(CuentaJugadores), y `Jugador` pasó a ser una entidad del dominio sin
+credenciales. Ver la nota en CuentaJugadores.
+
 Todavía sin conexión a base de datos — por ahora los datos viven en
-memoria (ver datos_prueba.py), y más adelante esta misma clase se
-conecta a PostgreSQL sin que el resto del código cambie.
+memoria (ver datos_prueba.py), y más adelante estas mismas clases se
+conectan a PostgreSQL sin que el resto del código cambie.
 """
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
 class Usuario:
-    """Clase base: todo lo que comparten un administrador y un jugador."""
+    """Clase base: todo lo que comparten las cuentas que inician sesión."""
 
     def __init__(self, id, correo, password_plano, rol):
         self.id = id
@@ -51,32 +63,61 @@ class Administrador(Usuario):
         }
 
 
-class Jugador(Usuario):
+class CuentaJugadores(Usuario):
     """
-    Un jugador del torneo, que además es usuario del sistema: entra con su
-    correo a ver sus propias estadísticas, y nada más que las suyas.
+    La cuenta única y compartida con la que entran TODOS los jugadores.
 
-    Hereda de Usuario porque en este sistema el jugador *es* un usuario. Si
-    fueran dos clases separadas habría que mantener sincronizados dos objetos
-    para representar a una sola persona.
+    Por qué una sola cuenta y no una por jugador: lo que los jugadores
+    consultan (partidos, posiciones y estadísticas de cualquier jugador)
+    es información pública del torneo, igual para todos. Mantener una
+    cuenta por persona obligaba a crear, repartir y resetear decenas de
+    contraseñas para no proteger ningún dato privado.
+
+    Consecuencia de diseño: esta cuenta es anónima — no representa a un
+    jugador concreto, así que no tiene equipo ni número de camiseta, y su
+    panel muestra el torneo entero en vez de "mis estadísticas".
+
+    Es de solo lectura: comparte el rol "jugador", que es exactamente el
+    que admin_requerido() deja fuera de las acciones de escritura.
     """
 
-    def __init__(self, id, correo, password_plano, equipo, nombres, apellidos, cedula, numero_camiseta):
+    def __init__(self, id, correo, password_plano):
         super().__init__(id, correo, password_plano, rol="jugador")
+
+    def panel_info(self):
+        return {
+            "tipo": "jugador",
+            "mensaje": "Partidos y tabla de posiciones del torneo.",
+        }
+
+
+class Jugador:
+    """
+    Un jugador del torneo: alguien de la plantilla de un equipo.
+
+    Ya no hereda de Usuario ni tiene contraseña. Con la cuenta compartida
+    (CuentaJugadores) el jugador dejó de ser una cuenta del sistema y pasó
+    a ser solo un sujeto de estadísticas: se lo consulta desde Equipos, no
+    inicia sesión.
+
+    El `correo` que sigue guardando es un dato de contacto (recibos,
+    avisos del capitán), no una credencial.
+    """
+
+    def __init__(self, id, correo, equipo, nombres, apellidos, cedula, numero_camiseta):
+        self.id = id
+        self.correo = correo
         self.equipo = equipo                    # objeto Equipo
         self.nombres = nombres
         self.apellidos = apellidos
         self.cedula = cedula
         self.numero_camiseta = numero_camiseta
-        # La huella ya no se guarda aquí: vive en PostgreSQL
+        # La huella no se guarda aquí: vive en PostgreSQL
         # (modelos.huella.RegistroBiometrico), enlazada por (tipo_persona,
         # persona_id) = ("jugador", self.id). Ver servicios/huella.py.
 
     def nombre_completo(self):
         return f"{self.nombres} {self.apellidos}"
 
-    def panel_info(self):
-        return {
-            "tipo": "jugador",
-            "mensaje": f"Bienvenido, {self.nombre_completo()}. Aquí verás tus estadísticas.",
-        }
+    def __repr__(self):
+        return f"<Jugador {self.nombre_completo()} #{self.numero_camiseta}>"

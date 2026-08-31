@@ -47,6 +47,8 @@ from biometria import (
     crear_proveedor,
 )
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from extensiones import db
 from modelos.huella import RegistroBiometrico
 
@@ -55,8 +57,40 @@ from modelos.huella import RegistroBiometrico
 RAIZ_PROYECTO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+#: Fallas al hablar con la tabla de huellas en PostgreSQL.
+#:
+#: `UnicodeDecodeError` no sobra: cuando Postgres rechaza la conexión, el
+#: mensaje de error de Windows viene en español y codificado en cp1252, y
+#: psycopg2 revienta al intentar leerlo como UTF-8 *antes* de poder
+#: envolverlo en un SQLAlchemyError. Sin esta entrada, ese caso —el más
+#: común: contraseña equivocada— se escaparía sin capturar.
+ERRORES_BASE = (SQLAlchemyError, UnicodeDecodeError)
+
+
 class ErrorHuella(Exception):
     """Error de negocio de la huella: se muestra tal cual al usuario."""
+
+
+class BaseHuellasNoDisponible(ErrorHuella):
+    """
+    No se pudo consultar la tabla de huellas.
+
+    Es distinto de "esta persona no tiene huella": acá no sabemos si la
+    tiene o no. Se separa para que la interfaz no diga "sin registrar"
+    cuando en realidad no pudo averiguarlo — un admin podría creer que a
+    alguien le falta enrolar la huella cuando el problema es la base.
+
+    Hereda de ErrorHuella para que las rutas que ya capturan ErrorHuella
+    la muestren como un aviso normal en vez de reventar con un 500.
+    """
+
+    MENSAJE = (
+        "No se pudo consultar la base de huellas. Revise DATABASE_URL en "
+        "el archivo .env y que PostgreSQL esté levantado."
+    )
+
+    def __init__(self, mensaje=None):
+        super().__init__(mensaje or BaseHuellasNoDisponible.MENSAJE)
 
 
 class LectorHuella:
@@ -120,12 +154,44 @@ class LectorHuella:
     # ── Enrolamiento ───────────────────────────────────────────────
 
     def tiene_huella(self, tipo_persona, persona_id):
-        return (
-            RegistroBiometrico.query.filter_by(
-                tipo_persona=tipo_persona, persona_id=persona_id
-            ).first()
-            is not None
-        )
+        """
+        True / False / None, donde None es "no se pudo averiguar".
+
+        Es una consulta de solo lectura que alimenta pantallas informativas
+        (la ficha del jugador, el panel de huellas). Si la base no responde
+        no tiene sentido tumbar la pantalla entera: se devuelve None y la
+        vista muestra "No disponible". Las operaciones que sí escriben
+        (registrar, verificar) siguen fallando con un mensaje explícito.
+        """
+        try:
+            return (
+                RegistroBiometrico.query.filter_by(
+                    tipo_persona=tipo_persona, persona_id=persona_id
+                ).first()
+                is not None
+            )
+        except ERRORES_BASE:
+            # La sesión queda inservible tras el fallo: sin rollback, la
+            # siguiente consulta de la misma petición también falla.
+            db.session.rollback()
+            return None
+
+    def huellas_registradas(self):
+        """
+        Todas las huellas, indexadas por (tipo_persona, persona_id).
+
+        Devuelve None —y no un dict vacío— si la base no responde: un dict
+        vacío significaría "no hay ninguna huella registrada", que es una
+        afirmación distinta.
+        """
+        try:
+            return {
+                (r.tipo_persona, r.persona_id): r
+                for r in RegistroBiometrico.query.all()
+            }
+        except ERRORES_BASE:
+            db.session.rollback()
+            return None
 
     def registrar(
         self,
@@ -179,25 +245,35 @@ class LectorHuella:
         referencia = RegistroBiometrico.referencia_para(tipo_persona, persona_id)
         plantilla = plantilla.con_referencia(referencia)
 
-        registro = RegistroBiometrico.query.filter_by(
-            tipo_persona=tipo_persona, persona_id=persona_id
-        ).first()
-        if registro is None:
-            registro = RegistroBiometrico(
+        # La captura ya se hizo; lo que queda es guardarla. Si la base no
+        # responde hay que decirlo con todas las letras: la huella que se
+        # acaba de tomar se pierde y hay que repetir el enrolamiento.
+        try:
+            registro = RegistroBiometrico.query.filter_by(
                 tipo_persona=tipo_persona, persona_id=persona_id
-            )
-            db.session.add(registro)
+            ).first()
+            if registro is None:
+                registro = RegistroBiometrico(
+                    tipo_persona=tipo_persona, persona_id=persona_id
+                )
+                db.session.add(registro)
 
-        registro.nombre_completo = nombre_completo
-        registro.correo = correo
-        registro.cedula = cedula
-        registro.dedo = int(plantilla.dedo)
-        registro.formato = plantilla.formato
-        registro.plantilla = plantilla.datos
-        registro.calidad = plantilla.calidad
-        registro.muestras_usadas = plantilla.muestras_usadas
-        registro.proveedor = plantilla.proveedor.value
-        db.session.commit()
+            registro.nombre_completo = nombre_completo
+            registro.correo = correo
+            registro.cedula = cedula
+            registro.dedo = int(plantilla.dedo)
+            registro.formato = plantilla.formato
+            registro.plantilla = plantilla.datos
+            registro.calidad = plantilla.calidad
+            registro.muestras_usadas = plantilla.muestras_usadas
+            registro.proveedor = plantilla.proveedor.value
+            db.session.commit()
+        except ERRORES_BASE:
+            db.session.rollback()
+            raise BaseHuellasNoDisponible(
+                "Se capturó la huella pero no se pudo guardar: "
+                + BaseHuellasNoDisponible.MENSAJE
+            )
         return registro
 
     # ── Verificación 1:1 (check-in: ya se sabe quién es) ────────────
@@ -211,9 +287,13 @@ class LectorHuella:
         infraestructura (lector desconectado, error del SDK), que sí
         capturamos aquí como `ErrorHuella`.
         """
-        registro = RegistroBiometrico.query.filter_by(
-            tipo_persona=tipo_persona, persona_id=persona_id
-        ).first()
+        try:
+            registro = RegistroBiometrico.query.filter_by(
+                tipo_persona=tipo_persona, persona_id=persona_id
+            ).first()
+        except ERRORES_BASE:
+            db.session.rollback()
+            raise BaseHuellasNoDisponible()
         if registro is None:
             raise ErrorHuella(
                 f"{nombre_visible or 'Esta persona'} no tiene huella registrada. "
@@ -257,9 +337,13 @@ class LectorHuella:
         coincide con el dedo recién apoyado. Devuelve `(persona_id,
         Coincidencia)`, o lanza `ErrorHuella` si no hay match.
         """
-        registros = RegistroBiometrico.query.filter_by(
-            tipo_persona=tipo_persona
-        ).all()
+        try:
+            registros = RegistroBiometrico.query.filter_by(
+                tipo_persona=tipo_persona
+            ).all()
+        except ERRORES_BASE:
+            db.session.rollback()
+            raise BaseHuellasNoDisponible()
         if not registros:
             raise ErrorHuella(
                 f"Todavía no hay huellas registradas para «{tipo_persona}»."
