@@ -1,0 +1,88 @@
+/* Estilos propios de GolStats — el resto lo pone Bootstrap 5 */
+
+:root {
+  --gs-primary: #0d3b66;       /* azul marino — color principal */
+  --gs-primary-dark: #082a4d;
+  --gs-accent: #f4a300;        /* dorado — acentos y detalles */
+  --gs-accent-dark: #c98400;
+}
+
+body {
+  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6, .navbar-brand, .display-6 {
+  font-family: 'Poppins', 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+}
+
+/* --- Paleta propia reemplazando el verde por defecto de Bootstrap --- */
+.bg-success {
+  background-color: var(--gs-primary) !important;
+}
+
+.btn-success {
+  --bs-btn-bg: var(--gs-primary);
+  --bs-btn-border-color: var(--gs-primary);
+  --bs-btn-hover-bg: var(--gs-primary-dark);
+  --bs-btn-hover-border-color: var(--gs-primary-dark);
+  --bs-btn-active-bg: var(--gs-primary-dark);
+  --bs-btn-active-border-color: var(--gs-primary-dark);
+  --bs-btn-focus-shadow-rgb: 13, 59, 102;
+}
+
+.text-success {
+  color: var(--gs-primary) !important;
+}
+
+.border-success {
+  border-color: var(--gs-primary) !important;
+}
+
+.card {
+  border: 1px solid rgba(0, 0, 0, .075);
+  border-radius: .75rem;
+}
+
+.card-header {
+  border-bottom: 1px solid rgba(0, 0, 0, .06);
+  border-radius: .75rem .75rem 0 0 !important;
+}
+
+/* Número grande del carnet del jugador */
+.carnet-foto {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gs-primary), var(--gs-primary-dark));
+  color: #fff;
+  font-size: 2.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.carnet {
+  border: 2px solid var(--gs-accent);
+}
+
+/* Logo del navbar */
+.gs-logo {
+  width: 28px;
+  height: 28px;
+  vertical-align: -6px;
+  margin-right: 4px;
+}
+
+/* En pantallas chicas las tablas se desplazan en vez de romper el layout */
+.table-responsive {
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 575.98px) {
+  .display-6 {
+    font-size: 1.75rem;
+  }
+}

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}GolStats{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/estilos.css') }}" rel="stylesheet">
+</head>
+<body class="bg-body-tertiary">
+
+{% if usuario %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm">
+  <div class="container">
+    <a class="navbar-brand fw-bold" href="{{ url_for('panel') }}">
+      <svg class="gs-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" fill="#fff"/>
+        <path d="M12 5.5 15.5 8 14.2 12.3H9.8L8.5 8Z" fill="#0d3b66"/>
+        <path d="M12 5.5 8.5 8M12 5.5 15.5 8M9.8 12.3 6.5 13.5M14.2 12.3 17.5 13.5M9.8 12.3 8.7 17M14.2 12.3 15.3 17" stroke="#0d3b66" stroke-width="0.9" stroke-linecap="round"/>
+      </svg>GolStats
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="menu">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('panel') }}">Inicio</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('equipos') }}">Equipos</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('partidos') }}">Partidos</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('reportes') }}">Reportes</a></li>
+      </ul>
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <span class="navbar-text text-white-50 me-3 small">
+            {{ usuario.correo }} ({{ usuario.rol }})
+          </span>
+        </li>
+        <li class="nav-item">
+          <a class="btn btn-sm btn-light" href="{{ url_for('logout') }}">Salir</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+{% endif %}
+
+<main class="container py-4">
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% if mensajes %}
+      {% for categoria, texto in mensajes %}
+        <div class="alert alert-{{ categoria }} alert-dismissible fade show" role="alert">
+          {{ texto }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  {% block contenido %}{% endblock %}
+</main>
+
+<footer class="text-center text-body-secondary py-4 small">
+  GolStats · Sistema de vocalías · {{ modo_huella }}
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

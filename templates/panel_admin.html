@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% from "_macros.html" import fila_partido, tabla_posiciones, badge_estado %}
+{% block titulo %}Panel de administración · GolStats{% endblock %}
+
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+  <div>
+    <h1 class="h4 fw-bold mb-1">Panel de administración</h1>
+    <p class="text-body-secondary mb-0">{{ info.mensaje }}</p>
+  </div>
+  <a href="{{ url_for('partidos') }}" class="btn btn-success">Ver partidos</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card text-center h-100"><div class="card-body">
+      <div class="h2 fw-bold text-success mb-0">{{ equipos|length }}</div>
+      <div class="small text-body-secondary">Equipos</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card text-center h-100"><div class="card-body">
+      <div class="h2 fw-bold text-success mb-0">{{ partidos|length }}</div>
+      <div class="small text-body-secondary">Partidos</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card text-center h-100"><div class="card-body">
+      <div class="h2 fw-bold text-warning mb-0">{{ proximos|length }}</div>
+      <div class="small text-body-secondary">Programados</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card text-center h-100"><div class="card-body">
+      <div class="h2 fw-bold text-primary mb-0">{{ goleadores|length }}</div>
+      <div class="small text-body-secondary">Goleadores</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-semibold">Próximos partidos</div>
+      <div class="card-body p-0">
+        {% if proximos %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr><th>Fecha</th><th>Partido</th><th class="text-center">Convocados</th>
+                  <th class="text-center">Check-in</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for p in proximos %}
+              <tr>
+                <td class="text-nowrap small">{{ p.fecha_hora.strftime('%d/%m %H:%M') }}</td>
+                <td>{{ p.equipo_local.nombre }} vs {{ p.equipo_visitante.nombre }}</td>
+                <td class="text-center">{{ p.obtener_convocados()|length }}</td>
+                <td class="text-center">
+                  {{ p.obtener_checkins()|length }} / {{ p.obtener_convocados()|length }}
+                </td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-outline-success"
+                     href="{{ url_for('partido_detalle', partido_id=p.id) }}">Vocalía</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-body-secondary">
+          <i class="bi bi-calendar-check display-4 d-block mb-2 opacity-50"></i>
+          <p class="mb-0">No hay partidos programados por ahora.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-semibold">Tabla de posiciones</div>
+      <div class="card-body p-0">{{ tabla_posiciones(posiciones) }}</div>
+      <div class="card-footer bg-white text-end">
+        <a href="{{ url_for('reportes') }}" class="small">Ver todos los reportes →</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-semibold">Goleadores</div>
+      <ul class="list-group list-group-flush">
+        {% for f in goleadores %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+            {{ f.jugador.nombre_completo() }}
+            <span class="text-body-secondary small">· {{ f.equipo.nombre }}</span>
+          </span>
+          <span class="badge text-bg-success rounded-pill">{{ f.goles }}</span>
+        </li>
+        {% else %}
+        <li class="list-group-item">
+          <div class="text-center py-4 text-body-secondary">
+            <i class="bi bi-dribbble display-6 d-block mb-2 opacity-50"></i>
+            <p class="mb-0 small">Todavía no hay goles registrados.</p>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header bg-white fw-semibold">Últimos correos enviados</div>
+      <ul class="list-group list-group-flush">
+        {% for m in bandeja %}
+        <li class="list-group-item">
+          <div class="small text-body-secondary">{{ m.para }}</div>
+          <div>{{ m.asunto }}</div>
+        </li>
+        {% else %}
+        <li class="list-group-item">
+          <div class="text-center py-4 text-body-secondary">
+            <i class="bi bi-envelope display-6 d-block mb-2 opacity-50"></i>
+            <p class="mb-0 small">Sin correos por ahora.</p>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

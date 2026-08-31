@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_macros.html" import fila_partido %}
+{% block titulo %}Partidos · GolStats{% endblock %}
+
+{% block contenido %}
+<h1 class="h4 fw-bold mb-4">Partidos</h1>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Fecha</th><th>Partido</th><th class="text-center">Marcador</th>
+            <th class="text-center">Estado</th></tr>
+      </thead>
+      <tbody>
+        {% for partido in partidos %}
+          {{ fila_partido(partido) }}
+        {% else %}
+        <tr><td colspan="4">
+          <div class="text-center py-5 text-body-secondary">
+            <i class="bi bi-calendar-x display-4 d-block mb-2 opacity-50"></i>
+            <p class="mb-0">No hay partidos cargados todavía.</p>
+          </div>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
