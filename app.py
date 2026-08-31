@@ -23,7 +23,7 @@ from flask import (
 from config import Config
 from datos_prueba import BD
 from extensiones import db
-from modelos import Partido, Tarjeta, CheckIn, RegistroBiometrico, TIPOS_PERSONA
+from modelos import Partido, Tarjeta, CheckIn, TIPOS_PERSONA
 from servicios import estadisticas
 from servicios.correo import ServicioCorreo
 from servicios.huella import LectorHuella, ErrorHuella
@@ -286,15 +286,16 @@ def biometria_panel():
     `registros_biometricos` en Postgres.
     """
     administradores = [u for u in BD.usuarios if u.rol == "admin"]
-    huellas = {
-        (r.tipo_persona, r.persona_id): r for r in RegistroBiometrico.query.all()
-    }
+    # None = la base no respondió. La plantilla lo distingue de {} (que
+    # sería "no hay ninguna huella registrada todavía").
+    huellas = lector.huellas_registradas()
     return render_template(
         "biometria.html",
         jugadores=BD.jugadores,
         arbitros=BD.arbitros,
         administradores=administradores,
-        huellas=huellas,
+        huellas=huellas if huellas is not None else {},
+        base_disponible=huellas is not None,
     )
 
 
