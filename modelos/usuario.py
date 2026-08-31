@@ -68,7 +68,9 @@ class Jugador(Usuario):
         self.apellidos = apellidos
         self.cedula = cedula
         self.numero_camiseta = numero_camiseta
-        self.codigo_huella = None               # se llena más adelante, con el lector real
+        # La huella ya no se guarda aquí: vive en PostgreSQL
+        # (modelos.huella.RegistroBiometrico), enlazada por (tipo_persona,
+        # persona_id) = ("jugador", self.id). Ver servicios/huella.py.
 
     def nombre_completo(self):
         return f"{self.nombres} {self.apellidos}"
