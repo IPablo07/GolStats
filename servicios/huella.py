@@ -30,6 +30,16 @@ En modo "simulado" (para desarrollar sin lector) no se toca hardware:
 coincidencia salvo que se guione explícitamente (ver tests del paquete
 `biometria`), así que el login con huella del administrador se prueba
 mejor con HUELLA_MODO=secugen y el lector conectado.
+
+Dos familias de avería, que se tratan por separado porque se arreglan de
+formas distintas:
+
+  · el lector (desenchufado, driver ausente, captura fallida) → se
+    traduce a `ErrorHuella` con un mensaje que dice qué revisar. Los
+    códigos crudos del SDK no le sirven de nada a quien lleva la vocalía.
+  · la base de huellas en PostgreSQL → `BaseHuellasNoDisponible`. Las
+    consultas de solo lectura ni siquiera fallan: devuelven None y la
+    pantalla muestra "No disponible".
 """
 
 import os
@@ -140,16 +150,66 @@ class LectorHuella:
             # arrancado con GolStats/ como directorio de trabajo.
             if hasattr(os, "add_dll_directory"):
                 os.add_dll_directory(RAIZ_PROYECTO)
-            self._proveedor = crear_proveedor(
-                "EXTERNO", lector=self.lector_modelo, umbral=self.umbral
-            )
+            try:
+                self._proveedor = crear_proveedor(
+                    "EXTERNO", lector=self.lector_modelo, umbral=self.umbral
+                )
+            except Exception as error:
+                # Abrir el dispositivo falla de muchas formas distintas
+                # (DLL ausente, lector desenchufado, driver sin instalar)
+                # y el SDK no las distingue: lo que importa es que la
+                # pantalla diga qué revisar, no cuál fue el código.
+                raise ErrorHuella(
+                    "No se pudo iniciar el lector SecuGen. Revise que esté "
+                    "conectado y que las DLL del dispositivo estén instaladas."
+                ) from error
         else:
             self._proveedor = crear_proveedor("SIMULADO", umbral=self.umbral)
         return self._proveedor
 
+    # ── Traducción de los errores del SDK ──────────────────────────
+    #
+    # El SDK de SecuGen informa las averías del lector con códigos, no con
+    # tipos distintos de excepción: un lector desenchufado a media captura
+    # llega como un fallo genérico de SGFPM_GetImageEx (código 2). Sin
+    # traducirlo, al vocal le aparecía ese texto crudo en pantalla y no
+    # había forma de saber que bastaba con volver a enchufar el lector.
+
+    _SENALES_DESCONEXION = ("sgfpm_getimageex", "código 2", "codigo 2", "code 2")
+
+    @classmethod
+    def _es_desconexion(cls, error):
+        mensaje = str(error).lower()
+        return any(senal in mensaje for senal in cls._SENALES_DESCONEXION)
+
+    MENSAJE_DESCONEXION = (
+        "El detector de huella fue desconectado o dejó de responder. "
+        "Conecte nuevamente el lector e inténtelo otra vez."
+    )
+
+    def _mensaje_captura_fallida(self, error):
+        if self._es_desconexion(error):
+            return LectorHuella.MENSAJE_DESCONEXION
+        return f"Falló la captura de la huella: {error}"
+
+    def _mensaje_error_lector(self, error):
+        if self._es_desconexion(error):
+            return LectorHuella.MENSAJE_DESCONEXION
+        return f"Error del lector de huella: {error}"
+
     def diagnostico(self):
         """Estado del lector, para una pantalla de preflight si hiciera falta."""
-        return self._obtener_proveedor().diagnostico()
+        try:
+            return self._obtener_proveedor().diagnostico()
+        except ErrorHuella:
+            raise
+        except LectorNoDisponible as error:
+            raise ErrorHuella(
+                "El detector de huella no está disponible. "
+                "Conecte el lector SecuGen."
+            ) from error
+        except Exception as error:
+            raise ErrorHuella(self._mensaje_error_lector(error)) from error
 
     # ── Enrolamiento ───────────────────────────────────────────────
 
@@ -230,17 +290,28 @@ class LectorHuella:
                             "sensor y el dedo, y vuelva a intentar."
                         )
                 except CapturaFallida as error:
-                    raise ErrorHuella(f"Falló la captura: {error}")
-                except LectorNoDisponible:
+                    raise ErrorHuella(
+                        self._mensaje_captura_fallida(error)
+                    ) from error
+                except LectorNoDisponible as error:
                     raise ErrorHuella(
                         "No se pudo conectar con el lector SecuGen. Revise "
                         "que esté conectado y que el driver esté instalado."
-                    )
+                    ) from error
+                except ErrorBiometrico as error:
+                    # Cualquier otra avería del SDK. Sin esta rama el error
+                    # se escapaba y la vocalía respondía un 500 en plena
+                    # toma de huella.
+                    raise ErrorHuella(
+                        self._mensaje_error_lector(error)
+                    ) from error
 
             try:
                 plantilla = proveedor.crear_plantilla(muestras)
             except ValueError as error:
-                raise ErrorHuella(str(error))
+                raise ErrorHuella(str(error)) from error
+            except ErrorBiometrico as error:
+                raise ErrorHuella(self._mensaje_error_lector(error)) from error
 
         referencia = RegistroBiometrico.referencia_para(tipo_persona, persona_id)
         plantilla = plantilla.con_referencia(referencia)
@@ -304,10 +375,28 @@ class LectorHuella:
         with self._candado:
             try:
                 veredicto = proveedor.verificar(registro.a_plantilla(), timeout_s=20)
-            except LectorNoDisponible:
-                raise ErrorHuella("No se pudo conectar con el lector SecuGen.")
+            except TiempoAgotado:
+                # Con el lector real estos tres casos SÍ se lanzan como
+                # excepción, además de poder viajar dentro del Veredicto.
+                raise ErrorHuella(
+                    "No se detectó el dedo a tiempo. Coloque el dedo sobre "
+                    "el sensor e inténtelo nuevamente."
+                )
+            except CalidadInsuficiente:
+                raise ErrorHuella(
+                    "La captura salió borrosa. Limpie el sensor y el dedo, "
+                    "y vuelva a intentar."
+                )
+            except CapturaFallida as error:
+                raise ErrorHuella(
+                    self._mensaje_captura_fallida(error)
+                ) from error
+            except LectorNoDisponible as error:
+                raise ErrorHuella(
+                    "No se pudo conectar con el lector SecuGen."
+                ) from error
             except ErrorBiometrico as error:
-                raise ErrorHuella(f"Error del lector: {error}")
+                raise ErrorHuella(self._mensaje_error_lector(error)) from error
 
         if veredicto.coincide:
             return veredicto
@@ -363,11 +452,15 @@ class LectorHuella:
                     "y vuelva a intentar."
                 )
             except CapturaFallida as error:
-                raise ErrorHuella(f"Falló la captura: {error}")
-            except LectorNoDisponible:
-                raise ErrorHuella("No se pudo conectar con el lector SecuGen.")
+                raise ErrorHuella(
+                    self._mensaje_captura_fallida(error)
+                ) from error
+            except LectorNoDisponible as error:
+                raise ErrorHuella(
+                    "No se pudo conectar con el lector SecuGen."
+                ) from error
             except ErrorBiometrico as error:
-                raise ErrorHuella(f"Error del lector: {error}")
+                raise ErrorHuella(self._mensaje_error_lector(error)) from error
 
         if coincidencia is None:
             raise ErrorHuella("La huella no coincide con ninguna registrada.")
@@ -380,9 +473,19 @@ class LectorHuella:
     # ── Ciclo de vida ────────────────────────────────────────────
 
     def cerrar(self):
+        """
+        Suelta el lector. Va registrado en atexit (ver app.py), así que un
+        error aquí ocurriría mientras Flask se está apagando: se traga a
+        propósito, porque no hay nada que hacer con él y dejarlo salir
+        convierte un cierre normal en un crash.
+        """
         if self._proveedor is not None:
-            self._proveedor.cerrar()
-            self._proveedor = None
+            try:
+                self._proveedor.cerrar()
+            except Exception:
+                pass
+            finally:
+                self._proveedor = None
 
     def __repr__(self):
         return f"<LectorHuella modo={self.modo} umbral={self.umbral}>"
