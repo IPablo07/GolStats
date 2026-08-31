@@ -20,6 +20,12 @@ class Usuario:
         self.rol = rol
 
     def verificar_password(self, password_plano):
+        """
+        Compara la contraseña escrita contra el hash guardado.
+
+        La contraseña en texto plano nunca se almacena: solo se guarda su
+        hash, y esta comparación es la única forma de validarla.
+        """
         return check_password_hash(self.password_hash, password_plano)
 
     def panel_info(self):
@@ -28,6 +34,13 @@ class Usuario:
 
 
 class Administrador(Usuario):
+    """
+    Quien carga la vocalía: registra los goles y tarjetas que anotó el
+    árbitro en papel, cobra la vocalía y controla el check-in.
+
+    Es el único rol que puede modificar datos del sistema.
+    """
+
     def __init__(self, id, correo, password_plano):
         super().__init__(id, correo, password_plano, rol="admin")
 
@@ -39,9 +52,18 @@ class Administrador(Usuario):
 
 
 class Jugador(Usuario):
+    """
+    Un jugador del torneo, que además es usuario del sistema: entra con su
+    correo a ver sus propias estadísticas, y nada más que las suyas.
+
+    Hereda de Usuario porque en este sistema el jugador *es* un usuario. Si
+    fueran dos clases separadas habría que mantener sincronizados dos objetos
+    para representar a una sola persona.
+    """
+
     def __init__(self, id, correo, password_plano, equipo, nombres, apellidos, cedula, numero_camiseta):
         super().__init__(id, correo, password_plano, rol="jugador")
-        self.equipo = equipo                    # objeto Equipo (lo creamos en el siguiente bloque)
+        self.equipo = equipo                    # objeto Equipo
         self.nombres = nombres
         self.apellidos = apellidos
         self.cedula = cedula

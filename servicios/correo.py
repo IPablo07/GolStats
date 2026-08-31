@@ -18,6 +18,13 @@ from modelos.notificacion import (
 
 
 class ServicioCorreo:
+    """
+    Manda las notificaciones del sistema.
+
+    No sabe qué dice cada correo: eso lo resuelve cada subclase de
+    Notificacion. Este servicio solo se ocupa de entregarlo, por Flask-Mail
+    si hay servidor configurado, o a la bandeja simulada si no lo hay.
+    """
 
     def __init__(self, activo=False, mail=None):
         self.activo = activo

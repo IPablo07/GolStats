@@ -15,6 +15,13 @@ from datetime import datetime
 
 
 class PagoVocalia:
+    """
+    Lo que cada equipo debe pagar por la vocalía de un partido.
+
+    Se crean dos por partido, uno por equipo, y arrancan en estado
+    pendiente. El estado no se puede asignar a mano: se cambia con
+    completar(), que además deja registrada la fecha del pago.
+    """
 
     PENDIENTE = "pendiente"
     COMPLETADO = "completado"
@@ -39,6 +46,14 @@ class PagoVocalia:
         return self._estado == PagoVocalia.COMPLETADO
 
     def completar(self, comprobante_pdf=None):
+        """
+        Marca el pago como completado y le pone la fecha del momento.
+
+        Las dos cosas van juntas a propósito: si el estado fuera público se
+        podría dejar un pago marcado como pagado pero sin fecha.
+        Lanza ValueError si el pago ya estaba completado, para no cobrar dos
+        veces ni pisar la fecha original.
+        """
         if self.esta_pagado():
             raise ValueError(
                 f"El pago del equipo {self.equipo.nombre} ya estaba completado"

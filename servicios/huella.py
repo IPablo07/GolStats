@@ -29,6 +29,16 @@ class ErrorHuella(Exception):
 
 
 class LectorHuella:
+    """
+    Decide si una huella capturada es válida o no.
+
+    No habla con el lector: eso lo hace el navegador (static/js/huella.js),
+    que es el único que puede llegar a https://localhost:8000. Esta clase
+    recibe el puntaje que devolvió el lector y lo compara contra el umbral.
+
+    En modo simulado acepta cualquier captura, para poder desarrollar sin
+    el hardware conectado.
+    """
 
     MODO_SECUGEN = "secugen"
     MODO_SIMULADO = "simulado"
