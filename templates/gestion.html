@@ -18,7 +18,7 @@
     <div class="card h-100 shadow-sm">
       <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         Equipos
-        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#formEquipo">
+        <button class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#formEquipo">
           + Nuevo Equipo
         </button>
       </div>
@@ -68,7 +68,7 @@
     <div class="card h-100 shadow-sm">
       <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         Árbitros
-        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#formArbitro">
+        <button class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#formArbitro">
           + Nuevo Árbitro
         </button>
       </div>
@@ -118,7 +118,7 @@
     <div class="card shadow-sm">
       <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         Jugadores
-        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#formJugador">
+        <button class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#formJugador">
           + Nuevo Jugador
         </button>
       </div>
@@ -169,7 +169,7 @@
             <ul class="list-group list-group-flush">
               {% for jugador in equipo.obtener_jugadores() %}
               <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                <span><span class="badge bg-secondary me-2">#{{ jugador.numero_camiseta }}</span> {{ jugador.nombre_completo() }}</span>
+                <span><span class="badge text-bg-light me-2">#{{ jugador.numero_camiseta }}</span> {{ jugador.nombre_completo() }}</span>
                 <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar"
                         data-bs-toggle="modal" data-bs-target="#modalEliminar"
                         data-url="{{ url_for('eliminar_jugador', jugador_id=jugador.id) }}"
@@ -178,7 +178,7 @@
                 </button>
               </li>
               {% else %}
-              <li class="list-group-item text-muted small px-0">No hay jugadores inscritos.</li>
+              <li class="list-group-item text-body-secondary small px-0">No hay jugadores inscritos.</li>
               {% endfor %}
             </ul>
           </div>
@@ -195,9 +195,9 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="post" id="form-eliminar">
-        <div class="modal-header bg-danger text-white">
+        <div class="modal-header">
           <h5 class="modal-title">Confirmar Eliminación</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           ¿Estás seguro de que deseas eliminar <strong id="texto-entidad"></strong>? Esta acción no se puede deshacer.
