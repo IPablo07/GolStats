@@ -6,6 +6,13 @@ Puente entre las clases de modelos/notificacion.py y el envío real.
 Si el .env no tiene servidor de correo configurado, las notificaciones
 quedan en la bandeja simulada (BANDEJA_SIMULADA) y se ven en la consola;
 así se puede probar todo el flujo sin cuenta de correo.
+
+Un envío que falla NUNCA tumba la operación que lo disparó. Cobrar la
+vocalía es lo importante; avisar al capitán es un accesorio. Si el correo
+no sale —credenciales mal puestas, sin internet, el puerto 587 bloqueado
+por la red— el pago se registra igual y quien está en pantalla se entera
+de que el aviso no salió, en vez de recibir una pantalla de error sobre
+una operación que en realidad sí funcionó.
 """
 
 from modelos.notificacion import (
@@ -29,15 +36,43 @@ class ServicioCorreo:
     def __init__(self, activo=False, mail=None):
         self.activo = activo
         self.mail = mail          # instancia de Flask-Mail, cuando exista
+        self.ultimo_error = None  # motivo del ultimo envio fallido
 
     def enviar(self, notificacion):
-        """Envía una Notificacion (cualquier subclase) — polimorfismo puro."""
+        """
+        Envía una Notificacion (cualquier subclase) — polimorfismo puro.
+
+        Nunca lanza por un fallo de entrega: devuelve el mensaje con
+        `enviado` en False y el motivo en `error`. Quien llama decide qué
+        contar al usuario; lo que no puede pasar es que un correo caído
+        deshaga un cobro que ya se registró.
+        """
         mensaje = notificacion.enviar()
-        if self.activo and self.mail is not None:
-            self._enviar_real(mensaje)
-        else:
+        mensaje["enviado"] = True
+        mensaje["error"] = None
+
+        if not (self.activo and self.mail is not None):
             print(f"[CORREO SIMULADO] Para: {mensaje['para']} | {mensaje['asunto']}")
+            return mensaje
+
+        try:
+            self._enviar_real(mensaje)
+        except Exception as error:
+            # Se traga a proposito, pero deja rastro en la consola: sin el
+            # log, un correo que no sale es invisible.
+            mensaje["enviado"] = False
+            mensaje["error"] = f"{type(error).__name__}: {error}"
+            self.ultimo_error = mensaje["error"]
+            print(f"[CORREO FALLIDO] Para: {mensaje['para']} | "
+                  f"{mensaje['asunto']} | {mensaje['error']}")
         return mensaje
+
+    @staticmethod
+    def todos_enviados(mensajes):
+        """True si salieron todos. Acepta un mensaje suelto o una lista."""
+        if isinstance(mensajes, dict):
+            mensajes = [mensajes]
+        return all(m.get("enviado", True) for m in mensajes)
 
     def _enviar_real(self, mensaje):
         from flask_mail import Message

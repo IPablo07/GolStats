@@ -541,8 +541,13 @@ def cambiar_estado(partido_id):
         correo.avisar_walkover(partido)
         flash(f"Walkover: {partido.motivo_walkover}", "warning")
     elif nuevo_estado == Partido.FINALIZADO:
-        correo.enviar_recibos(partido)
-        flash("Partido finalizado. Se enviaron los recibos por correo.", "success")
+        recibos = correo.enviar_recibos(partido)
+        if correo.todos_enviados(recibos):
+            flash("Partido finalizado. Se enviaron los recibos por correo.",
+                  "success")
+        else:
+            flash("Partido finalizado. No se pudieron enviar los recibos "
+                  "por correo.", "warning")
     else:
         flash(f"El partido pasó a {nuevo_estado.replace('_', ' ')}.", "success")
 
@@ -674,11 +679,21 @@ def registrar_pago(partido_id):
 
     try:
         pago = partido.completar_pago(equipo)
-        correo.avisar_pago_completado(partido, equipo, pago.monto)
-        flash(
-            f"Pago registrado. Se avisó al capitán de {equipo.nombre} por correo.",
-            "success",
-        )
+        aviso = correo.avisar_pago_completado(partido, equipo, pago.monto)
+        # El cobro ya quedó hecho: si el correo no salió se dice, pero no
+        # se presenta como un fallo del pago.
+        if correo.todos_enviados(aviso):
+            flash(
+                f"Pago registrado. Se avisó al capitán de {equipo.nombre} "
+                f"por correo.",
+                "success",
+            )
+        else:
+            flash(
+                f"Pago registrado. No se pudo avisar al capitán de "
+                f"{equipo.nombre} por correo.",
+                "warning",
+            )
     except ValueError as e:
         flash(str(e), "danger")
 
@@ -710,7 +725,10 @@ def avisar_partido(partido_id):
     equipo = BD.buscar_equipo(int(request.form.get("equipo_id", 0)))
     enviados = correo.avisar_partido_proximo(partido, equipo)
 
-    if equipo is not None:
+    if not correo.todos_enviados(enviados):
+        flash("No se pudo enviar el aviso por correo. Revise la "
+              "configuración de MAIL_* en el archivo .env.", "warning")
+    elif equipo is not None:
         flash(f"Aviso del partido enviado al capitán de {equipo.nombre}.", "info")
     else:
         flash(f"Aviso del partido enviado a los {len(enviados)} capitanes.", "info")
