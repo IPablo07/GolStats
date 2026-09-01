@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}GolStats{% endblock %}</title>
+  <link rel="icon" type="image/png" sizes="64x64"
+        href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="apple-touch-icon"
+        href="{{ url_for('static', filename='img/favicon-180.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -16,11 +20,8 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm">
   <div class="container">
     <a class="navbar-brand fw-bold" href="{{ url_for('panel') }}">
-      <svg class="gs-logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="10" fill="#fff"/>
-        <path d="M12 5.5 15.5 8 14.2 12.3H9.8L8.5 8Z" fill="#0d3b66"/>
-        <path d="M12 5.5 8.5 8M12 5.5 15.5 8M9.8 12.3 6.5 13.5M14.2 12.3 17.5 13.5M9.8 12.3 8.7 17M14.2 12.3 15.3 17" stroke="#0d3b66" stroke-width="0.9" stroke-linecap="round"/>
-      </svg>GolStats
+      <img class="gs-logo" alt=""
+           src="{{ url_for('static', filename='img/logo-navbar.png') }}">GolStats
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menu">
       <span class="navbar-toggler-icon"></span>
