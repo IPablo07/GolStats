@@ -192,7 +192,8 @@ def _generar_eventos(partido, azar, minuto_desde, minuto_hasta):
                 companeros = [j for j in plantel if j.id != goleador.id]
                 asistente = azar.choice(companeros)
             partido.registrar_gol(
-                goleador, azar.randint(minuto_desde, minuto_hasta), asistente
+                goleador, azar.randint(minuto_desde, minuto_hasta), asistente,
+                validar_minuto=False,
             )
 
     for _ in range(azar.choice(TARJETAS_POR_TIEMPO)):

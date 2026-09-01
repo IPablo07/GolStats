@@ -505,8 +505,14 @@ class Partido:
                 f"{jugador.nombre_completo()} no hizo check-in, no pudo jugar"
             )
 
-    def registrar_gol(self, jugador, minuto, jugador_asistencia=None):
+    def registrar_gol(self, jugador, minuto, jugador_asistencia=None, validar_minuto=True):
         """Regla 3: al registrar un gol se actualiza solo el marcador."""
+        # Los goles quedan bloqueados en el medio tiempo. No se toca
+        # esta_en_juego() porque también la usan las tarjetas y el
+        # encargo solo pide bloquear goles.
+        if self._estado == Partido.MEDIO_TIEMPO:
+            raise ValueError("No se pueden registrar goles durante el medio tiempo")
+
         self._validar_registro_en_juego(jugador)
         if jugador_asistencia is not None:
             self._validar_registro_en_juego(jugador_asistencia)
@@ -515,6 +521,20 @@ class Partido:
                     "La asistencia debe ser de un compañero del mismo equipo"
                 )
 
+        # El minuto no puede ir por delante del cronómetro. datos_prueba.py
+        # genera los 12 partidos del torneo llamando a iniciar_primer_tiempo()
+        # y registrando goles de forma instantánea: el reloj arranca, pero
+        # el partido entero se juega en microsegundos, así que
+        # minuto_actual() marcaría siempre 1 y rechazaría casi todos los
+        # goles simulados. Por eso el parámetro validar_minuto: la ruta real
+        # de la vocalía (app.py) lo deja en True; datos_prueba.py lo pasa en
+        # False porque ahí el minuto es simulado, no cronometrado de verdad.
+        if validar_minuto and self.reloj_corriendo() and minuto > self.minuto_actual():
+            raise ValueError(
+                f"El partido va por el minuto {self.minuto_actual()}: no se "
+                f"puede registrar un gol en el {minuto}"
+            )
+
         gol = Gol(self, jugador, minuto, jugador_asistencia)
         self._goles.append(gol)
         if self.es_local(jugador.equipo):
@@ -522,6 +542,8 @@ class Partido:
         else:
             self.goles_visitante += 1
         return gol
+
+   
 
     def registrar_tarjeta(self, jugador, tipo, minuto):
         """
