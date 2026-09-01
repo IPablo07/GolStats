@@ -84,6 +84,15 @@ EQUIPOS = [
     },
 ]
 
+# Escenario del calendario. Con 4 equipos salen 12 partidos y estos numeros
+# dan lo que interesa ensenar: 10 jugados, uno resuelto por walkover y uno
+# con el check-in a medias. Si el torneo tiene menos equipos se recortan
+# solos, para no quedarse sin ningun partido programado que abrir en la
+# vocalia (ver _escenario_calendario).
+PARTIDOS_JUGADOS = 10
+PARTIDO_WALKOVER = 7
+PARTIDO_CHECKIN_PARCIAL = 11
+
 # Cuántos goles hace un equipo en un tiempo: casi siempre 0 o 1, a veces más.
 GOLES_POR_TIEMPO = [0, 0, 1, 1, 1, 2, 2, 3]
 TARJETAS_POR_TIEMPO = [0, 1, 1, 2]
@@ -270,6 +279,118 @@ class BaseDatosMemoria:
 
 
 # ══════════════════════════════════════════════════════════════════
+#  Carga desde PostgreSQL
+# ══════════════════════════════════════════════════════════════════
+#
+#  Si las tablas del esquema (database/) existen y tienen filas, el torneo
+#  se arma con ESOS datos en vez de con la lista EQUIPOS de arriba. Asi se
+#  puede insertar por SQL o por pgAdmin y verlo en la web al reiniciar.
+#
+#  Es una carga de solo lectura, y al arrancar: lo que se cree despues
+#  desde la pantalla de Gestion sigue viviendo solo en memoria. Conectar
+#  tambien la escritura es el paso siguiente.
+
+
+def _conexion_postgres():
+    """
+    Conexion directa con psycopg2, sin pasar por SQLAlchemy.
+
+    Este modulo se importa en app.py ANTES de que exista la aplicacion
+    Flask —`db.init_app(app)` viene despues—, asi que aqui no hay contexto
+    de aplicacion y `db.session` no se puede usar. psycopg2 ya es
+    dependencia del proyecto y no necesita contexto.
+    """
+    import psycopg2
+    from config import Config
+    return psycopg2.connect(Config.DATABASE_URL, connect_timeout=5)
+
+
+def _cargar_torneo_desde_postgres(bd):
+    """
+    Llena `bd` con los equipos, jugadores y arbitros de PostgreSQL.
+
+    Devuelve True si cargo algo util, y False si no habia base, no estaban
+    las tablas o estaban vacias — en cuyo caso el llamador se queda con los
+    datos de ejemplo. Nunca lanza: que la base no responda no puede impedir
+    que la aplicacion arranque.
+
+    Las cuentas de usuario NO se leen de la base a proposito:
+    05_datos_iniciales.sql guarda un hash de marcador, no uno real, y
+    cargarlo dejaria a todo el mundo sin poder entrar. Las dos cuentas se
+    siguen creando en codigo.
+    """
+    try:
+        conn = _conexion_postgres()
+    except Exception:
+        return False
+
+    try:
+        cur = conn.cursor()
+
+        cur.execute(
+            "SELECT id, nombre, nombre_capitan, correo_capitan"
+            " FROM equipos WHERE activo ORDER BY id"
+        )
+        filas_equipos = cur.fetchall()
+        if not filas_equipos:
+            return False
+
+        por_id = {}
+        for id_, nombre, capitan, correo_capitan in filas_equipos:
+            equipo = Equipo(id_, nombre, capitan, correo_capitan)
+            por_id[id_] = equipo
+            bd.equipos.append(equipo)
+
+        cur.execute(
+            "SELECT id, equipo_id, nombres, apellidos, cedula,"
+            " numero_camiseta, correo"
+            " FROM jugadores WHERE activo ORDER BY equipo_id, numero_camiseta"
+        )
+        for id_, equipo_id, nombres, apellidos, cedula, dorsal, correo in cur.fetchall():
+            equipo = por_id.get(equipo_id)
+            if equipo is None:
+                continue
+            jugador = Jugador(
+                id=id_, correo=correo, equipo=equipo, nombres=nombres,
+                apellidos=apellidos, cedula=cedula, numero_camiseta=dorsal,
+            )
+            equipo.agregar_jugador(jugador)
+            bd.jugadores.append(jugador)
+
+        cur.execute(
+            "SELECT id, nombres, correo, telefono"
+            " FROM arbitros WHERE activo ORDER BY id"
+        )
+        bd.arbitros = [Arbitro(*fila) for fila in cur.fetchall()]
+
+        # Un torneo sin jugadores no sirve para nada: mejor caer a los
+        # datos de ejemplo que arrancar con equipos vacios.
+        return len(bd.jugadores) > 0
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+
+def _escenario_calendario(total_partidos):
+    """
+    Cuantos partidos se dan por jugados y cuales son los casos especiales.
+
+    Con los 4 equipos de ejemplo salen 12 partidos y devuelve exactamente
+    lo de siempre (10 jugados, el 7 walkover, el 11 a medias). Si el torneo
+    que viene de la base tiene menos equipos, se recorta: siempre quedan al
+    menos dos partidos por jugar, porque sin ellos no habria nada que abrir
+    en la vocalia ni forma de ensenar el cronometro.
+    """
+    jugados = min(PARTIDOS_JUGADOS, max(0, total_partidos - 2))
+    walkover = PARTIDO_WALKOVER if PARTIDO_WALKOVER <= jugados else None
+    parcial = (PARTIDO_CHECKIN_PARCIAL
+               if PARTIDO_CHECKIN_PARCIAL <= total_partidos
+               else (jugados + 1 if total_partidos > jugados else None))
+    return jugados, walkover, parcial
+
+
+# ══════════════════════════════════════════════════════════════════
 #  Construcción de los datos
 # ══════════════════════════════════════════════════════════════════
 
@@ -377,7 +498,14 @@ def _jugar_walkover(partido, azar, equipo_moroso):
 
 
 def crear_datos_prueba():
-    """Arma el torneo completo: equipos, árbitros y los 12 partidos."""
+    """
+    Arma el torneo completo: equipos, arbitros y su calendario.
+
+    Los equipos, jugadores y arbitros salen de PostgreSQL si las tablas
+    del esquema estan creadas y con datos; si no, de la lista EQUIPOS de
+    este archivo. Los partidos se simulan igual en los dos casos: la base
+    guarda el plantel, no los resultados.
+    """
     azar = random.Random(SEMILLA)
     bd = BaseDatosMemoria()
 
@@ -392,39 +520,47 @@ def crear_datos_prueba():
                         password_plano=PASSWORD_JUGADORES)
     )
 
-    bd.arbitros = [
-        Arbitro(1, "Carlos Mendoza", "cmendoza@golstats.com", "0991112233"),
-        Arbitro(2, "Luis Paredes", "lparedes@golstats.com", "0994445566"),
-        Arbitro(3, "Jorge Espinoza", "jespinoza@golstats.com", "0997778899"),
-    ]
+    desde_base = _cargar_torneo_desde_postgres(bd)
+    if desde_base:
+        print(f"DEBUG: torneo cargado desde PostgreSQL "
+              f"({len(bd.equipos)} equipos, {len(bd.jugadores)} jugadores)")
+    else:
+        print("DEBUG: torneo desde los datos de ejemplo (datos_prueba.EQUIPOS)")
+        _crear_equipos(bd)
 
-    _crear_equipos(bd)
+    if not bd.arbitros:
+        bd.arbitros = [
+            Arbitro(1, "Carlos Mendoza", "cmendoza@golstats.com", "0991112233"),
+            Arbitro(2, "Luis Paredes", "lparedes@golstats.com", "0994445566"),
+            Arbitro(3, "Jorge Espinoza", "jespinoza@golstats.com", "0997778899"),
+        ]
 
     hoy = datetime.now().replace(minute=0, second=0, microsecond=0)
     enfrentamientos = _calendario(bd.equipos)
+    jugados, n_walkover, n_parcial = _escenario_calendario(len(enfrentamientos))
 
     for numero, (local, visitante) in enumerate(enfrentamientos, start=1):
-        # Los 10 primeros ya se jugaron, los 2 últimos están por venir.
-        ya_se_jugo = numero <= 10
+        # Los primeros ya se jugaron, los ultimos estan por venir.
+        ya_se_jugo = numero <= jugados
         if ya_se_jugo:
-            fecha = hoy - timedelta(days=(11 - numero) * 3)
+            fecha = hoy - timedelta(days=(jugados + 1 - numero) * 3)
         else:
-            fecha = hoy + timedelta(days=(numero - 10) * 4)
+            fecha = hoy + timedelta(days=(numero - jugados) * 4)
 
         partido = Partido(
             id=numero,
             equipo_local=local,
             equipo_visitante=visitante,
             fecha_hora=fecha,
-            arbitro=bd.arbitros[numero % len(bd.arbitros)],
+            arbitro=bd.arbitros[numero % len(bd.arbitros)] if bd.arbitros else None,
         )
 
-        if numero == 7:
+        if numero == n_walkover:
             # Un walkover, para que se vea esa pantalla en el sistema.
             _jugar_walkover(partido, azar, equipo_moroso=visitante)
         elif ya_se_jugo:
             _jugar_partido(partido, azar)
-        elif numero == 11:
+        elif numero == n_parcial:
             # Programado y con el check-in a medio hacer, para probar que el
             # partido no arranca hasta que estén todos.
             partido.convocar_varios(

@@ -41,6 +41,13 @@ ON CONFLICT (correo) DO NOTHING;
 
 
 -- ── Equipos ─────────────────────────────────────────────────────────
+--
+--  Nombres y correos de ejemplo A PROPOSITO. Este archivo se sube al
+--  repositorio, que es publico: los datos personales de los capitanes
+--  reales no se versionan.
+--
+--  Para poner los de verdad en TU base, sin tocar este archivo, mira la
+--  seccion "Personalizar los datos en tu maquina" de database/README.md.
 INSERT INTO equipos (nombre, nombre_capitan, correo_capitan) VALUES
     ('Leones FC',       'Andres Salazar', 'capitan.leones@golstats.com'),
     ('Aguilas SC',      'Fernando Ruiz',  'capitan.aguilas@golstats.com'),

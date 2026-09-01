@@ -53,6 +53,58 @@ hay datos reales que conservar, hará falta una migración en vez de este script
 `modelos/huella.py` y ya está en producción con huellas enroladas. El script
 solo le añade los `CHECK` que le faltaban, sin recrearla ni vaciarla.
 
+## Personalizar los datos en tu máquina
+
+Los nombres y correos de los capitanes en `05_datos_iniciales.sql` son de
+ejemplo **a propósito**: este archivo se sube al repositorio, que es público,
+y ahí no van datos personales de nadie.
+
+Si quieres los reales en tu base —por ejemplo para que los avisos de partido
+lleguen de verdad— hazlo **después** de correr los scripts, con un `UPDATE`.
+No edites el `05`: si lo haces, tus datos acaban en el próximo commit.
+
+```bash
+psql -U postgres -d golstats
+```
+
+Y dentro:
+
+```sql
+UPDATE equipos
+   SET nombre_capitan = 'Nombre real', correo_capitan = 'correo@real.com'
+ WHERE nombre = 'Leones FC';
+```
+
+Uno por cada equipo que quieras cambiar. Para comprobar cómo quedó:
+
+```sql
+SELECT nombre, nombre_capitan, correo_capitan FROM equipos ORDER BY id;
+```
+
+Reinicias `python app.py` y la web ya los muestra.
+
+### Si prefieres tenerlo en un archivo
+
+Crea `database/99_datos_locales.sql` con tus `UPDATE`, y lo ejecutas después
+del `05`:
+
+```bash
+psql -U postgres -d golstats -f database/99_datos_locales.sql
+```
+
+**Añádelo al `.gitignore`** para que no se suba:
+
+```
+database/99_datos_locales.sql
+```
+
+Así lo vuelves a aplicar cuando reconstruyas la base, sin tenerlo que escribir
+a mano cada vez y sin publicarlo.
+
+> **Ojo con los correos reales:** el botón "Avisar a los capitanes" de la
+> vocalía envía de verdad. Con los correos `@golstats.com` de ejemplo solo te
+> rebotan a ti; con los reales, les llega a ellos.
+
 ## Las contraseñas de `05_datos_iniciales.sql`
 
 Van con un marcador, no con un hash real: werkzeug genera una sal distinta en
