@@ -21,8 +21,15 @@ PUNTOS_EMPATE = 1
 
 
 def partidos_cerrados(partidos):
-    """Solo cuentan los partidos ya terminados (finalizados o walkover)."""
-    return [p for p in partidos if p.esta_cerrado()]
+    """
+    Solo cuentan los partidos ya terminados (finalizados o walkover).
+
+    Se filtra por `cuenta_para_estadisticas()` y no por `esta_cerrado()`:
+    un partido cancelado también está cerrado, pero nunca se jugó. Con
+    `esta_cerrado()` cada cancelación repartiría un empate a 0 entre los
+    dos equipos y les sumaría un partido jugado que no existió.
+    """
+    return [p for p in partidos if p.cuenta_para_estadisticas()]
 
 
 # ══════════════════════════════════════════════════════════════════

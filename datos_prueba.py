@@ -225,6 +225,50 @@ class BaseDatosMemoria:
                 raise ValueError("No se puede eliminar: el árbitro está asignado a uno o más partidos.")
 
         self.arbitros.remove(arbitro)
+
+    def crear_partido(self, equipo_local, equipo_visitante, fecha_hora, arbitro=None):
+        """
+        Programa un partido nuevo.
+
+        El propio Partido ya rechaza que un equipo juegue contra sí mismo,
+        así que esa regla no se repite aquí. Lo que sí se valida es lo que
+        el modelo no puede saber: que los equipos existan, que la fecha
+        venga completa y que no sea pasada.
+        """
+        if equipo_local is None or equipo_visitante is None:
+            raise ValueError("Seleccione los dos equipos del partido.")
+        if fecha_hora is None:
+            raise ValueError("Indique la fecha y la hora del partido.")
+        if fecha_hora < datetime.now():
+            raise ValueError("No se puede programar un partido en una fecha pasada.")
+
+        # max()+1 y no len()+1: con partidos cancelados o borrados, len()
+        # se repite y dos partidos acabarian con el mismo id.
+        nuevo_id = max([p.id for p in self.partidos], default=0) + 1
+        partido = Partido(
+            id=nuevo_id,
+            equipo_local=equipo_local,
+            equipo_visitante=equipo_visitante,
+            fecha_hora=fecha_hora,
+            arbitro=arbitro,
+        )
+        # Se convoca a las dos plantillas completas, igual que hace el
+        # calendario de prueba: sin convocados el partido no puede iniciar.
+        partido.convocar_varios(
+            equipo_local.obtener_jugadores() + equipo_visitante.obtener_jugadores()
+        )
+        self.partidos.append(partido)
+        return partido
+
+    def cancelar_partido(self, partido_id, motivo=None):
+        """Marca el partido como cancelado. No lo borra: ver Partido.cancelar()."""
+        partido = self.buscar_partido(partido_id)
+        if partido is None:
+            raise ValueError("Partido no encontrado.")
+        partido.cancelar(motivo)
+        return partido
+
+
 # ══════════════════════════════════════════════════════════════════
 #  Construcción de los datos
 # ══════════════════════════════════════════════════════════════════

@@ -7,9 +7,13 @@
       'medio_tiempo': 'warning',
       'segundo_tiempo': 'success',
       'finalizado': 'dark',
-      'walkover': 'danger'
+      'walkover': 'danger',
+      'cancelado': 'secondary'
   } %}
-  <span class="badge text-bg-{{ colores.get(estado, 'secondary') }}">
+  {# `programado` tambien es gris: el cancelado se tacha para que no se
+     confundan de un vistazo en una lista donde conviven los dos. #}
+  <span class="badge text-bg-{{ colores.get(estado, 'secondary') }}
+               {% if estado == 'cancelado' %}text-decoration-line-through{% endif %}">
     {{ estado.replace('_', ' ')|capitalize }}
   </span>
 {% endmacro %}

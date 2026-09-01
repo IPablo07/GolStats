@@ -138,10 +138,11 @@ class Partido:
     SEGUNDO_TIEMPO = "segundo_tiempo"
     FINALIZADO = "finalizado"
     WALKOVER = "walkover"
+    CANCELADO = "cancelado"
 
     ESTADOS = (
         PROGRAMADO, PRIMER_TIEMPO, MEDIO_TIEMPO,
-        SEGUNDO_TIEMPO, FINALIZADO, WALKOVER,
+        SEGUNDO_TIEMPO, FINALIZADO, WALKOVER, CANCELADO,
     )
 
     MONTO_VOCALIA = 20.00
@@ -166,6 +167,7 @@ class Partido:
         self.goles_visitante = 0
         self.equipo_ganador = None
         self.motivo_walkover = None
+        self.motivo_cancelacion = None
 
         # Colecciones internas — se leen con los métodos obtener_*()
         self._convocados = []
@@ -196,6 +198,31 @@ class Partido:
                                 Partido.SEGUNDO_TIEMPO)
 
     def esta_cerrado(self):
+        """
+        El partido ya no admite cambios.
+
+        Incluye los cancelados a propósito: es lo que hace que la vocalía
+        oculte sola los controles del admin, el cobro y la edición de
+        eventos, sin tener que repetir la comprobación en cada sitio.
+
+        Ojo: "cerrado" no es lo mismo que "jugado". Para las estadísticas
+        hace falta además que el partido se haya disputado — ver
+        `cuenta_para_estadisticas()`.
+        """
+        return self._estado in (Partido.FINALIZADO, Partido.WALKOVER,
+                                Partido.CANCELADO)
+
+    def esta_cancelado(self):
+        return self._estado == Partido.CANCELADO
+
+    def cuenta_para_estadisticas(self):
+        """
+        Si este partido suma en la tabla de posiciones y los goleadores.
+
+        Un cancelado está cerrado pero nunca se jugó: no reparte puntos ni
+        goles. Sin esta distinción, cancelar un partido le regalaría un
+        empate a 0 a los dos equipos.
+        """
         return self._estado in (Partido.FINALIZADO, Partido.WALKOVER)
 
     def marcador(self):
@@ -493,6 +520,31 @@ class Partido:
             self.equipo_ganador = self.equipo_visitante
         else:
             self.equipo_ganador = None       # empate
+        return self._estado
+
+    def cancelar(self, motivo=None):
+        """
+        Suspende un partido que todavía no se ha jugado.
+
+        Solo desde `programado`, y por eso no es una transición más del
+        ciclo normal: un partido ya iniciado no se cancela, se resuelve
+        —por walkover si alguien no pagó, o finalizándolo—. Cancelar uno
+        en juego borraría de un plumazo goles y tarjetas ya registrados.
+
+        No se elimina el partido: se marca. El historial queda a la vista
+        y ni la tabla de posiciones ni los goleadores lo cuentan, porque
+        `cuenta_para_estadisticas()` lo deja fuera.
+        """
+        if self._estado == Partido.CANCELADO:
+            raise ValueError("El partido ya estaba cancelado")
+        if self._estado != Partido.PROGRAMADO:
+            raise ValueError(
+                f"Solo se puede cancelar un partido programado. Este está en "
+                f"estado {self._estado.replace('_', ' ')}"
+            )
+
+        self._estado = Partido.CANCELADO
+        self.motivo_cancelacion = motivo or "Cancelado por el administrador"
         return self._estado
 
     # ── Goles y tarjetas ──────────────────────────────────────────

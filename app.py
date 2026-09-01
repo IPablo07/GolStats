@@ -14,6 +14,7 @@ Ejecutar:
 """
 
 import atexit
+from datetime import datetime
 from functools import wraps
 
 from flask import (
@@ -373,6 +374,70 @@ def registrar_huella(tipo_persona, persona_id):
     return redirect(url_for("biometria_panel"))
 
 
+# --- PARTIDOS ---
+@app.route("/gestion/partidos/nuevo", methods=["POST"])
+@admin_requerido
+def nuevo_partido():
+    try:
+        local = BD.buscar_equipo(int(request.form.get("equipo_local") or 0))
+        visitante = BD.buscar_equipo(int(request.form.get("equipo_visitante") or 0))
+        arbitro_id = request.form.get("arbitro_id")
+        arbitro = next(
+            (a for a in BD.arbitros if a.id == int(arbitro_id)), None
+        ) if arbitro_id else None
+
+        crudo = (request.form.get("fecha_hora") or "").strip()
+        if not crudo:
+            raise ValueError("Indique la fecha y la hora del partido.")
+        try:
+            # El input datetime-local manda "2026-09-04T20:00".
+            fecha = datetime.fromisoformat(crudo)
+        except ValueError:
+            raise ValueError("La fecha y hora no tienen un formato válido.")
+
+        partido = BD.crear_partido(local, visitante, fecha, arbitro)
+        flash(
+            f"Partido #{partido.id} programado: {partido.equipo_local.nombre} vs "
+            f"{partido.equipo_visitante.nombre}.",
+            "success",
+        )
+    except ValueError as e:
+        flash(str(e), "danger")
+    return redirect(url_for("gestion_panel"))
+
+
+@app.route("/partidos/<int:partido_id>/cancelar", methods=["POST"])
+@admin_requerido
+def cancelar_partido(partido_id):
+    """
+    Cancela un partido programado.
+
+    No lo borra: el historial se mantiene visible con su estado. Como el
+    partido pasa a estar cerrado, la vocalía deja de ofrecer sus acciones
+    —incluida la de avisar a los capitanes—, que es lo que evita que se
+    sigan mandando correos de un partido que ya no se juega.
+    """
+    partido = BD.buscar_partido(partido_id)
+    if partido is None:
+        abort(404)
+
+    motivo = (request.form.get("motivo") or "").strip()
+    try:
+        BD.cancelar_partido(partido_id, motivo or None)
+        flash(
+            f"Partido cancelado: {partido.equipo_local.nombre} vs "
+            f"{partido.equipo_visitante.nombre}.",
+            "warning",
+        )
+    except ValueError as e:
+        flash(str(e), "danger")
+
+    destino = request.form.get("volver_a", "gestion_panel")
+    if destino == "partido_detalle":
+        return redirect(url_for("partido_detalle", partido_id=partido.id))
+    return redirect(url_for("gestion_panel"))
+
+
 # ══════════════════════════════════════════════════════════════════
 #  Partidos
 # ══════════════════════════════════════════════════════════════════
@@ -635,6 +700,13 @@ def avisar_partido(partido_id):
     if partido is None:
         abort(404)
 
+    if partido.esta_cancelado():
+        # Salvaguarda: la plantilla ya oculta el boton, pero la ruta se
+        # puede llamar directamente y no tiene sentido convocar a nadie a
+        # un partido que no se juega.
+        flash("El partido está cancelado: no se envían avisos.", "danger")
+        return redirect(url_for("partido_detalle", partido_id=partido.id))
+
     equipo = BD.buscar_equipo(int(request.form.get("equipo_id", 0)))
     enviados = correo.avisar_partido_proximo(partido, equipo)
 
@@ -655,7 +727,10 @@ def gestion_panel():
     return render_template(
         "gestion.html",
         equipos=BD.equipos,
-        arbitros=BD.arbitros
+        arbitros=BD.arbitros,
+        # Del mas reciente al mas antiguo, igual que /partidos.
+        partidos=sorted(BD.partidos, key=lambda p: p.fecha_hora, reverse=True),
+        ahora=datetime.now(),
     )
 
 # --- EQUIPOS ---
