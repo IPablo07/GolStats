@@ -8,7 +8,8 @@ segundo tiempo, pierde por walkover. Esa validación vive en Partido,
 aquí solo se modela el pago en sí.
 
 Equivalente en la base de datos: tabla `pagos_vocalia` + el stored
-procedure sp_completar_pago_vocalia().
+procedure sp_completar_pago_vocalia()
+(ver database/03_procedimientos.sql).
 """
 
 from datetime import datetime
