@@ -39,6 +39,14 @@ class Equipo:
         self._jugadores.append(jugador)
         jugador.equipo = self
         return jugador
+    
+    def quitar_jugador(self, jugador):
+        """
+        Saca a un jugador de la plantilla del equipo.
+        """
+        if self.tiene_jugador(jugador):
+            self._jugadores.remove(jugador)
+            jugador.equipo = None
 
     def obtener_jugadores(self):
         """

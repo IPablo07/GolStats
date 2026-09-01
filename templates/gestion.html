@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block titulo %}Gestión · GolStats{% endblock %}
+
+{% block contenido %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 fw-bold mb-0">Gestión del Torneo</h1>
+</div>
+
+<div class="alert alert-info shadow-sm mb-4">
+  <i class="bi bi-info-circle-fill me-2"></i>
+  <strong>Aviso:</strong> Los datos actuales viven en memoria. Los cambios realizados aquí se mantienen mientras el servidor esté encendido.
+</div>
+
+<div class="row g-4">
+  
+  {# ── EQUIPOS ──────────────────────────────────────────────────────── #}
+  <div class="col-12 col-lg-6">
+    <div class="card h-100 shadow-sm">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        Equipos
+        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#formEquipo">
+          + Nuevo Equipo
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="collapse mb-3" id="formEquipo">
+          <form method="post" action="{{ url_for('nuevo_equipo') }}" class="card card-body bg-light">
+            <div class="mb-2">
+              <label class="form-label small">Nombre del Equipo</label>
+              <input type="text" name="nombre" class="form-control form-control-sm" required>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="form-label small">Capitán</label>
+                <input type="text" name="nombre_capitan" class="form-control form-control-sm" required>
+              </div>
+              <div class="col-6">
+                <label class="form-label small">Correo Capitán</label>
+                <input type="email" name="correo_capitan" class="form-control form-control-sm" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success btn-sm w-100">Guardar Equipo</button>
+          </form>
+        </div>
+        
+        <ul class="list-group list-group-flush">
+          {% for equipo in equipos %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <div>
+              <strong>{{ equipo.nombre }}</strong>
+              <div class="small text-body-secondary">Capitán: {{ equipo.nombre_capitan }}</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar"
+                    data-bs-toggle="modal" data-bs-target="#modalEliminar"
+                    data-url="{{ url_for('eliminar_equipo', equipo_id=equipo.id) }}"
+                    data-entidad="al equipo {{ equipo.nombre }}">
+              Eliminar
+            </button>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  {# ── ÁRBITROS ─────────────────────────────────────────────────────── #}
+  <div class="col-12 col-lg-6">
+    <div class="card h-100 shadow-sm">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        Árbitros
+        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#formArbitro">
+          + Nuevo Árbitro
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="collapse mb-3" id="formArbitro">
+          <form method="post" action="{{ url_for('nuevo_arbitro') }}" class="card card-body bg-light">
+            <div class="mb-2">
+              <label class="form-label small">Nombres Completos</label>
+              <input type="text" name="nombres" class="form-control form-control-sm" required>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="form-label small">Correo</label>
+                <input type="email" name="correo" class="form-control form-control-sm">
+              </div>
+              <div class="col-6">
+                <label class="form-label small">Teléfono</label>
+                <input type="text" name="telefono" class="form-control form-control-sm">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success btn-sm w-100">Guardar Árbitro</button>
+          </form>
+        </div>
+
+        <ul class="list-group list-group-flush">
+          {% for arbitro in arbitros %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <div>
+              <strong>{{ arbitro.nombres }}</strong>
+              <div class="small text-body-secondary">{{ arbitro.correo }}</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar"
+                    data-bs-toggle="modal" data-bs-target="#modalEliminar"
+                    data-url="{{ url_for('eliminar_arbitro', arbitro_id=arbitro.id) }}"
+                    data-entidad="al árbitro {{ arbitro.nombres }}">
+              Eliminar
+            </button>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  {# ── JUGADORES ────────────────────────────────────────────────────── #}
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        Jugadores
+        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#formJugador">
+          + Nuevo Jugador
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="collapse mb-4" id="formJugador">
+          <form method="post" action="{{ url_for('nuevo_jugador') }}" class="card card-body bg-light">
+            <div class="row g-2 mb-2">
+              <div class="col-12 col-md-4">
+                <label class="form-label small">Equipo</label>
+                <select name="equipo_id" class="form-select form-select-sm" required>
+                  <option value="">Seleccione...</option>
+                  {% for equipo in equipos %}
+                  <option value="{{ equipo.id }}">{{ equipo.nombre }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-6 col-md-4">
+                <label class="form-label small">Nombres</label>
+                <input type="text" name="nombres" class="form-control form-control-sm" required>
+              </div>
+              <div class="col-6 col-md-4">
+                <label class="form-label small">Apellidos</label>
+                <input type="text" name="apellidos" class="form-control form-control-sm" required>
+              </div>
+            </div>
+            <div class="row g-2 mb-3">
+              <div class="col-4">
+                <label class="form-label small">Cédula</label>
+                <input type="text" name="cedula" class="form-control form-control-sm" required>
+              </div>
+              <div class="col-4">
+                <label class="form-label small">Camiseta</label>
+                <input type="number" name="numero_camiseta" class="form-control form-control-sm" min="1" max="99" required>
+              </div>
+              <div class="col-4">
+                <label class="form-label small">Correo</label>
+                <input type="email" name="correo" class="form-control form-control-sm" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-success btn-sm w-100">Guardar Jugador</button>
+          </form>
+        </div>
+
+        <div class="row g-4">
+          {% for equipo in equipos %}
+          <div class="col-12 col-md-6">
+            <h5 class="fw-bold text-success">{{ equipo.nombre }}</h5>
+            <ul class="list-group list-group-flush">
+              {% for jugador in equipo.obtener_jugadores() %}
+              <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                <span><span class="badge bg-secondary me-2">#{{ jugador.numero_camiseta }}</span> {{ jugador.nombre_completo() }}</span>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar"
+                        data-bs-toggle="modal" data-bs-target="#modalEliminar"
+                        data-url="{{ url_for('eliminar_jugador', jugador_id=jugador.id) }}"
+                        data-entidad="al jugador {{ jugador.nombre_completo() }}">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </li>
+              {% else %}
+              <li class="list-group-item text-muted small px-0">No hay jugadores inscritos.</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── Modal de Confirmación de Borrado ─────────────────────────────── #}
+<div class="modal fade" id="modalEliminar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="form-eliminar">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Confirmar Eliminación</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          ¿Estás seguro de que deseas eliminar <strong id="texto-entidad"></strong>? Esta acción no se puede deshacer.
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('.btn-eliminar').forEach(boton => {
+    boton.addEventListener('click', function() {
+      document.getElementById('form-eliminar').action = this.dataset.url;
+      document.getElementById('texto-entidad').textContent = this.dataset.entidad;
+    });
+  });
+</script>
+{% endblock %}

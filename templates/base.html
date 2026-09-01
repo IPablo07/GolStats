@@ -34,6 +34,7 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('reportes') }}">Reportes</a></li>
         {% if usuario.rol == 'admin' %}
         <li class="nav-item"><a class="nav-link" href="{{ url_for('biometria_panel') }}">Huellas</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('gestion_panel') }}">Gestión</a></li>
         {% endif %}
       </ul>
       <ul class="navbar-nav">
