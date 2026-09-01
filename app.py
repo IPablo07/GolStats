@@ -265,16 +265,29 @@ def jugador_detalle(jugador_id):
     if jugador is None:
         abort(404)
 
-    # Sin restricción por dueño: con la cuenta compartida no hay "mis"
-    # estadísticas, y desde Equipos se llega a la ficha de cualquier
-    # jugador de cualquier equipo. Escribir sigue siendo solo del admin
-    # (el botón de enrolar huella lo controla la plantilla).
     return render_template(
         "jugador_detalle.html",
         jugador=jugador,
         resumen=estadisticas.estadisticas_jugador(jugador, BD.partidos),
         tiene_huella=lector.tiene_huella("jugador", jugador.id),
     )
+
+
+@app.route("/jugadores/<int:jugador_id>/camiseta", methods=["POST"])
+@admin_requerido
+def cambiar_camiseta(jugador_id):
+    jugador = BD.buscar_jugador(jugador_id)
+    if jugador is None:
+        abort(404)
+        
+    try:
+        numero_nuevo = request.form.get("numero_camiseta")
+        jugador.equipo.cambiar_numero(jugador, numero_nuevo)
+        flash(f"El dorsal de {jugador.nombre_completo()} se actualizó al #{numero_nuevo}.", "success")
+    except ValueError as e:
+        flash(str(e), "danger")
+        
+    return redirect(url_for("jugador_detalle", jugador_id=jugador.id))
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -535,6 +548,52 @@ def registrar_tarjeta(partido_id):
 
     return redirect(url_for("partido_detalle", partido_id=partido.id))
 
+@app.route("/partidos/<int:partido_id>/gol/<int:evento_id>/editar", methods=["POST"])
+@admin_requerido
+def editar_gol(partido_id, evento_id):
+    partido = BD.buscar_partido(partido_id)
+    if partido is None: abort(404)
+        
+    try:
+        jugador = BD.buscar_jugador(int(request.form.get("jugador_id", 0)))
+        if jugador is None:
+            raise ValueError("Seleccione el jugador que anotó.")
+        
+        asistencia_id = request.form.get("asistencia_id")
+        asistente = BD.buscar_jugador(int(asistencia_id)) if asistencia_id else None
+        minuto = int(request.form.get("minuto", 0))
+        
+        if not 1 <= minuto <= 120:
+            raise ValueError("El minuto debe estar entre 1 y 120.")
+        
+        gol = partido.editar_gol(evento_id, jugador, minuto, asistente)
+        flash(f"Gol editado: {gol.descripcion()}", "success")
+    except ValueError as e:
+        flash(str(e), "danger")
+        
+    return redirect(url_for("partido_detalle", partido_id=partido.id))
+
+@app.route("/partidos/<int:partido_id>/tarjeta/<int:evento_id>/editar", methods=["POST"])
+@admin_requerido
+def editar_tarjeta(partido_id, evento_id):
+    partido = BD.buscar_partido(partido_id)
+    if partido is None: abort(404)
+        
+    try:
+        jugador = BD.buscar_jugador(int(request.form.get("jugador_id", 0)))
+        if jugador is None:
+            raise ValueError("Seleccione el jugador sancionado.")
+            
+        minuto = int(request.form.get("minuto", 0))
+        if not 1 <= minuto <= 120:
+            raise ValueError("El minuto debe estar entre 1 y 120.")
+        
+        tarjeta = partido.editar_tarjeta(evento_id, jugador, request.form.get("tipo"), minuto)
+        flash(f"Tarjeta editada: {tarjeta.descripcion()}", "success")
+    except ValueError as e:
+        flash(str(e), "danger")
+        
+    return redirect(url_for("partido_detalle", partido_id=partido.id))
 
 @app.route("/partidos/<int:partido_id>/pago", methods=["POST"])
 @admin_requerido
