@@ -32,6 +32,15 @@ class Config:
     HUELLA_LECTOR = os.getenv("HUELLA_LECTOR", "secugen:hsdu03p")
 
     # ── Correo ────────────────────────────────────────────────────
+    # Nunca el volcado SMTP, ni con FLASK_DEBUG=1.
+    #
+    # Flask-Mail hereda su modo depuracion de app.debug, y ese volcado
+    # incluye la linea "AUTH PLAIN ..." con usuario y contrasena en base64.
+    # Como el proyecto arranca en debug por defecto, cada correo enviado
+    # imprimiria la contrasena de aplicacion en la consola: basta con una
+    # captura de pantalla o un log guardado para filtrarla.
+    MAIL_DEBUG = False
+
     MAIL_SERVER = os.getenv("MAIL_SERVER", "")
     MAIL_PORT = int(os.getenv("MAIL_PORT", "587"))
     MAIL_USE_TLS = _bool(os.getenv("MAIL_USE_TLS"), True)
