@@ -37,7 +37,13 @@
       </div>
     </div>
     <div class="mt-2">{{ badge_estado(partido.estado) }}</div>
-    {% if partido.motivo_walkover %}
+    {% if partido.esta_cancelado() %}
+    <div class="alert alert-secondary mt-3 mb-0">
+      <strong>Partido cancelado.</strong>
+      {{ partido.motivo_cancelacion }}<br>
+      <span class="small">No cuenta para la tabla de posiciones ni se envían avisos.</span>
+    </div>
+    {% elif partido.motivo_walkover %}
     <div class="alert alert-danger mt-3 mb-0">
       <strong>Walkover:</strong> {{ partido.motivo_walkover }}
       {% if partido.equipo_ganador %}<br>Gana {{ partido.equipo_ganador.nombre }}.{% endif %}

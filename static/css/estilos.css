@@ -2,6 +2,7 @@
 
 :root {
   --gs-primary: #0d3b66;       /* azul marino — color principal */
+  --gs-primary-rgb: 13, 59, 102;   /* el mismo, en componentes: ver .bg-* */
   --gs-primary-dark: #082a4d;
   --gs-accent: #f4a300;        /* dorado — acentos y detalles */
   --gs-accent-dark: #c98400;
@@ -18,8 +19,20 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-6 {
 }
 
 /* --- Paleta propia reemplazando el verde por defecto de Bootstrap --- */
+
+/*
+ * El fondo se declara con rgba() y no con el color plano, para no romper
+ * las utilidades `bg-opacity-*` de Bootstrap.
+ *
+ * Antes esto era `background-color: var(--gs-primary) !important`, y ese
+ * !important sobre un color solido ignoraba --bs-bg-opacity: una tarjeta
+ * escrita como `bg-success bg-opacity-10` —que deberia salir azul palido—
+ * salia azul marino a tope, y el texto oscuro encima se volvia ilegible.
+ * Con rgba() y el valor por defecto en 1, el color solido se mantiene
+ * donde no se pide opacidad, y `bg-opacity-10` vuelve a tintar.
+ */
 .bg-success {
-  background-color: var(--gs-primary) !important;
+  background-color: rgba(var(--gs-primary-rgb), var(--bs-bg-opacity, 1)) !important;
 }
 
 .btn-success {
@@ -37,6 +50,38 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-6 {
 }
 
 .border-success {
+  border-color: var(--gs-primary) !important;
+}
+
+/*
+ * Cinturon de seguridad: la familia `primary` tambien al color de marca.
+ *
+ * El proyecto pinta su azul sobre las clases `success`, que es una herencia
+ * rara pero ya establecida. El problema es que quien escribe `btn-primary`
+ * por costumbre —es lo natural en Bootstrap— se trae el azul de fabrica
+ * (#0d6efd), y acaban conviviendo dos azules distintos en la misma pantalla.
+ * Con esto, escribir `primary` o `success` da el mismo resultado y la
+ * incoherencia no puede volver a colarse.
+ */
+.bg-primary {
+  background-color: rgba(var(--gs-primary-rgb), var(--bs-bg-opacity, 1)) !important;
+}
+
+.btn-primary {
+  --bs-btn-bg: var(--gs-primary);
+  --bs-btn-border-color: var(--gs-primary);
+  --bs-btn-hover-bg: var(--gs-primary-dark);
+  --bs-btn-hover-border-color: var(--gs-primary-dark);
+  --bs-btn-active-bg: var(--gs-primary-dark);
+  --bs-btn-active-border-color: var(--gs-primary-dark);
+  --bs-btn-focus-shadow-rgb: 13, 59, 102;
+}
+
+.text-primary {
+  color: var(--gs-primary) !important;
+}
+
+.border-primary {
   border-color: var(--gs-primary) !important;
 }
 

@@ -39,7 +39,7 @@
         <form method="post" action="{{ url_for('cambiar_camiseta', jugador_id=jugador.id) }}" class="d-flex align-items-center gap-2">
           <label for="numero_camiseta" class="form-label small fw-semibold mb-0 text-nowrap">Nuevo Dorsal:</label>
           <input type="number" name="numero_camiseta" id="numero_camiseta" class="form-control form-control-sm" value="{{ jugador.numero_camiseta }}" min="1" max="99" required>
-          <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+          <button type="submit" class="btn btn-success btn-sm">Guardar</button>
         </form>
       </div>
       {% endif %}
