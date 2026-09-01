@@ -37,14 +37,22 @@ class Config:
     MAIL_USE_TLS = _bool(os.getenv("MAIL_USE_TLS"), True)
     MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
-    MAIL_DEFAULT_SENDER = os.getenv(
-        "MAIL_DEFAULT_SENDER", "GolStats <no-reply@golstats.com>"
+    # Remitente por defecto. Gmail ignora cualquier remitente que no sea la
+    # propia cuenta autenticada, así que si MAIL_USERNAME está configurado
+    # se usa ese: poner otro haría que los correos salgan "en nombre de"
+    # una dirección que no existe, y acaban en spam.
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER") or (
+        f"GolStats <{MAIL_USERNAME}>" if MAIL_USERNAME
+        else "GolStats <no-reply@golstats.com>"
     )
+
+    # Días de antelación con que se avisa al capitán del partido próximo.
+    DIAS_AVISO_PARTIDO = int(os.getenv("DIAS_AVISO_PARTIDO", "3"))
 
     # Si no hay servidor de correo configurado, los correos se simulan.
     @classmethod
     def correo_activo(cls):
-        return bool(cls.MAIL_SERVER and cls.MAIL_USERNAME)
+        return bool(cls.MAIL_SERVER and cls.MAIL_USERNAME and cls.MAIL_PASSWORD)
 
     # ── Base de datos ────────────────────────────────────────────
     # Por ahora PostgreSQL solo guarda la tabla de huellas (registros_

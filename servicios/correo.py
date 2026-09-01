@@ -11,7 +11,7 @@ así se puede probar todo el flujo sin cuenta de correo.
 from modelos.notificacion import (
     BANDEJA_SIMULADA,
     NotificacionPagoCompletado,
-    NotificacionPagoPendiente,
+    NotificacionPartidoProximo,
     NotificacionWalkover,
     NotificacionReciboPDF,
 )
@@ -59,10 +59,21 @@ class ServicioCorreo:
             NotificacionPagoCompletado(equipo.correo_capitan, equipo, partido, monto)
         )
 
-    def avisar_pago_pendiente(self, partido, equipo, monto):
-        return self.enviar(
-            NotificacionPagoPendiente(equipo.correo_capitan, equipo, partido, monto)
-        )
+    def avisar_partido_proximo(self, partido, equipo=None):
+        """
+        Avisa al capitán —o a los dos, si no se indica equipo— de que
+        tienen partido. Devuelve la lista de correos enviados.
+        """
+        equipos = [equipo] if equipo is not None else list(partido.equipos())
+        return [
+            self.enviar(
+                NotificacionPartidoProximo(
+                    e.correo_capitan, e, partido,
+                    monto=partido.obtener_pago(e).monto,
+                )
+            )
+            for e in equipos
+        ]
 
     def avisar_walkover(self, partido):
         enviados = []

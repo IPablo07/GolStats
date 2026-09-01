@@ -13,7 +13,7 @@ from modelos.partido import Partido, EventoPartido, Gol, Tarjeta, CheckIn
 from modelos.notificacion import (
     Notificacion,
     NotificacionPagoCompletado,
-    NotificacionPagoPendiente,
+    NotificacionPartidoProximo,
     NotificacionWalkover,
     NotificacionReciboPDF,
 )
@@ -23,7 +23,7 @@ __all__ = [
     "Usuario", "Administrador", "CuentaJugadores", "Jugador",
     "Equipo", "Arbitro", "PagoVocalia",
     "Partido", "EventoPartido", "Gol", "Tarjeta", "CheckIn",
-    "Notificacion", "NotificacionPagoCompletado", "NotificacionPagoPendiente",
+    "Notificacion", "NotificacionPagoCompletado", "NotificacionPartidoProximo",
     "NotificacionWalkover", "NotificacionReciboPDF",
     "RegistroBiometrico", "TIPOS_PERSONA",
 ]

@@ -22,7 +22,7 @@ from flask import (
 
 from config import Config
 from datos_prueba import BD
-from extensiones import db
+from extensiones import db, mail
 from modelos import Partido, Tarjeta, CheckIn, TIPOS_PERSONA
 from servicios import estadisticas
 from servicios.correo import ServicioCorreo
@@ -32,6 +32,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 db.init_app(app)
+mail.init_app(app)
 with app.app_context():
     print("DEBUG: probando conexión...")
 
@@ -48,7 +49,10 @@ with app.app_context():
         print(e)
 
 lector = LectorHuella.desde_config(Config)
-correo = ServicioCorreo(activo=Config.correo_activo())
+# Sin pasarle `mail`, ServicioCorreo se queda en modo simulado por mucho
+# que el .env tenga servidor: la comprobación interna es
+# `self.activo and self.mail is not None`.
+correo = ServicioCorreo(activo=Config.correo_activo(), mail=mail)
 atexit.register(lector.cerrar)  # libera el lector al apagar el servidor
 
 
@@ -557,17 +561,28 @@ def registrar_pago(partido_id):
     return redirect(url_for("partido_detalle", partido_id=partido.id))
 
 
-@app.route("/partidos/<int:partido_id>/recordar-pago", methods=["POST"])
+@app.route("/partidos/<int:partido_id>/avisar-partido", methods=["POST"])
 @admin_requerido
-def recordar_pago(partido_id):
+def avisar_partido(partido_id):
+    """
+    Le recuerda a los capitanes que tienen partido.
+
+    Reemplaza al viejo recordatorio de pago de vocalía: el cobro se hace en
+    cancha el día del partido, así que perseguir al capitán por correo
+    llegaba tarde. Lo que sí le sirve es saber cuándo debe presentarse con
+    su equipo; el monto de la vocalía viaja como dato dentro del aviso.
+    """
     partido = BD.buscar_partido(partido_id)
     if partido is None:
         abort(404)
 
     equipo = BD.buscar_equipo(int(request.form.get("equipo_id", 0)))
-    pago = partido.obtener_pago(equipo)
-    correo.avisar_pago_pendiente(partido, equipo, pago.monto)
-    flash(f"Recordatorio enviado al capitán de {equipo.nombre}.", "info")
+    enviados = correo.avisar_partido_proximo(partido, equipo)
+
+    if equipo is not None:
+        flash(f"Aviso del partido enviado al capitán de {equipo.nombre}.", "info")
+    else:
+        flash(f"Aviso del partido enviado a los {len(enviados)} capitanes.", "info")
     return redirect(url_for("partido_detalle", partido_id=partido.id))
 
 
