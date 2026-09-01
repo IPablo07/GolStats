@@ -182,8 +182,20 @@ def estadisticas_jugador(jugador, partidos):
 
 def estadisticas_equipo(equipo, partidos):
     """Resumen de un equipo, para la ficha de equipo del front."""
+    # tabla_posiciones() descarta los partidos cuyo rival no está en la
+    # tabla que recibe. Si le pasáramos solo [equipo], todos sus partidos
+    # se descartarían porque el rival nunca aparecería. Por eso deducimos
+    # aquí todos los equipos que participan en `partidos` (más el propio
+    # equipo, por si aún no jugó ninguno) y calculamos la tabla completa,
+    # quedándonos solo con la fila que nos interesa.
+    equipos_torneo = {equipo.id: equipo}
+    for partido in partidos:
+        equipos_torneo[partido.equipo_local.id] = partido.equipo_local
+        equipos_torneo[partido.equipo_visitante.id] = partido.equipo_visitante
+
     fila = next(
-        (f for f in tabla_posiciones([equipo], partidos) if f["equipo"].id == equipo.id),
+        (f for f in tabla_posiciones(equipos_torneo.values(), partidos)
+         if f["equipo"].id == equipo.id),
         None,
     )
     jugadores = [estadisticas_jugador(j, partidos) for j in equipo.obtener_jugadores()]
