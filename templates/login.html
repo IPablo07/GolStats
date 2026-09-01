@@ -6,9 +6,11 @@
   <div class="col-12 col-sm-10 col-md-6 col-lg-4">
 
     <div class="text-center mb-4">
-      <div class="display-5">⚽</div>
-      <h1 class="h3 fw-bold text-success">GolStats</h1>
-      <p class="text-body-secondary">Sistema de vocalías de fútbol</p>
+      {# El logo ya lleva el nombre y el lema dentro, asi que aqui no se
+         repiten en texto: se deja como alt para lectores de pantalla. #}
+      <img class="gs-logo-login"
+           src="{{ url_for('static', filename='img/logo.png') }}"
+           alt="GolStats · Sistema de vocalías de fútbol">
     </div>
 
     <div class="card shadow-sm">

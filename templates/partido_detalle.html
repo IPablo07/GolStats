@@ -123,6 +123,13 @@
             {% if partido.estado != 'segundo_tiempo' %}disabled{% endif %}>
       Finalizar partido
     </button>
+    {% if partido.estado == 'programado' %}
+    <form method="post" action="{{ url_for('avisar_partido', partido_id=partido.id) }}">
+      <button class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-envelope"></i> Avisar a los capitanes
+      </button>
+    </form>
+    {% endif %}
     </div>
   </div>
   {% endif %}
@@ -158,10 +165,7 @@
                     data-equipo="{{ pago.equipo.nombre }}">
               Registrar pago
             </button>
-            <form method="post" action="{{ url_for('recordar_pago', partido_id=partido.id) }}">
-              <input type="hidden" name="equipo_id" value="{{ pago.equipo.id }}">
-              <button class="btn btn-sm btn-outline-secondary">Recordar</button>
-            </form>
+
           </div>
           {% endif %}
         </li>

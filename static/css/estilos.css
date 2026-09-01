@@ -68,12 +68,19 @@ h1, h2, h3, h4, h5, h6, .navbar-brand, .display-6 {
   border: 2px solid var(--gs-accent);
 }
 
-/* Logo del navbar */
+/* Logo del navbar. Solo el emblema: el nombre ya va como texto al lado. */
 .gs-logo {
-  width: 28px;
-  height: 28px;
-  vertical-align: -6px;
-  margin-right: 4px;
+  height: 32px;
+  width: auto;
+  vertical-align: -9px;
+  margin-right: 6px;
+}
+
+/* Logo completo (emblema + nombre + lema) para la pantalla de ingreso */
+.gs-logo-login {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
 }
 
 /* En pantallas chicas las tablas se desplazan en vez de romper el layout */

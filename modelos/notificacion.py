@@ -91,25 +91,55 @@ class NotificacionPagoCompletado(Notificacion):
         )
 
 
-class NotificacionPagoPendiente(Notificacion):
-    """Recordatorio: si no paga antes del segundo tiempo, pierde por walkover."""
+class NotificacionPartidoProximo(Notificacion):
+    """
+    Aviso al capitán de que su equipo tiene partido.
 
-    def __init__(self, destinatario, equipo, partido, monto):
+    Sustituye al viejo recordatorio de pago pendiente: perseguir al capitán
+    por la vocalía llegaba tarde —el cobro se hace en cancha, el día del
+    partido— y lo que de verdad le sirve es saber cuándo tiene que estar
+    allí con su equipo. El monto va como dato, no como reclamo.
+    """
+
+    def __init__(self, destinatario, equipo, partido, monto=None):
         super().__init__(destinatario, equipo, partido)
         self.monto = monto
 
+    def dias_restantes(self):
+        """Días que faltan para el partido. Negativo si ya pasó."""
+        return (self.partido.fecha_hora.date() - datetime.now().date()).days
+
+    def _cuando(self):
+        dias = self.dias_restantes()
+        if dias == 0:
+            return "HOY"
+        if dias == 1:
+            return "MAÑANA"
+        return f"en {dias} días"
+
     def asunto(self):
-        return f"GolStats - Pago de vocalía PENDIENTE ({self.equipo.nombre})"
+        rival = (
+            self.partido.equipo_visitante
+            if self.partido.es_local(self.equipo)
+            else self.partido.equipo_local
+        )
+        return f"GolStats - Su equipo juega {self._cuando()} contra {rival.nombre}"
 
     def cuerpo(self):
+        p = self.partido
+        condicion = "local" if p.es_local(self.equipo) else "visitante"
+        vocalia = (
+            f"Recuerde llevar la vocalía: ${self.monto:.2f}.\n"
+            if self.monto is not None else ""
+        )
         return (
             f"Hola {self.equipo.nombre_capitan},\n\n"
-            f"El equipo {self.equipo.nombre} todavía no ha cancelado la vocalía "
-            f"de ${self.monto:.2f}.\n\n"
-            f"{self._encabezado_partido()}\n"
-            f"IMPORTANTE: si el pago no se completa antes de que inicie el "
-            f"segundo tiempo, el partido se declara walkover a favor del equipo "
-            f"contrario.\n\n"
+            f"El equipo {self.equipo.nombre} juega {self._cuando()}.\n\n"
+            f"{self._encabezado_partido()}"
+            f"Condición: {condicion}\n"
+            f"{vocalia}\n"
+            f"Convoque a su plantilla con tiempo: los jugadores deben hacer "
+            f"el check-in con huella antes de que inicie el partido.\n\n"
             f"GolStats"
         )
 
