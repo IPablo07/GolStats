@@ -142,6 +142,89 @@ class BaseDatosMemoria:
         return [p for p in self.partidos if p.esta_convocado(jugador)]
 
 
+# ── Gestión de Entidades (Alta y Baja) ────────────────────────
+    
+    def agregar_jugador(self, equipo, nombres, apellidos, cedula, numero_camiseta, correo):
+        if not nombres or not apellidos or not cedula:
+            raise ValueError("Nombres, apellidos y cédula son obligatorios.")
+            
+        nuevo_id = max([j.id for j in self.jugadores], default=0) + 1
+        jugador = Jugador(
+            id=nuevo_id,
+            correo=correo,
+            equipo=equipo,
+            nombres=nombres,
+            apellidos=apellidos,
+            cedula=cedula,
+            numero_camiseta=int(numero_camiseta)
+        )
+        equipo.agregar_jugador(jugador)  # Lanza error si el número se repite
+        self.jugadores.append(jugador)
+        return jugador
+
+    def eliminar_jugador(self, jugador_id):
+        jugador = self.buscar_jugador(jugador_id)
+        if not jugador:
+            raise ValueError("Jugador no encontrado.")
+
+        # Regla: No se puede borrar si tiene goles o tarjetas en partidos cerrados
+        for partido in self.partidos:
+            if partido.esta_cerrado():
+                for evento in partido.obtener_eventos():
+                    if evento.jugador.id == jugador.id:
+                        raise ValueError(f"No se puede eliminar: tiene eventos registrados en el partido #{partido.id} que ya finalizó.")
+                    if hasattr(evento, 'jugador_asistencia') and evento.jugador_asistencia and evento.jugador_asistencia.id == jugador.id:
+                        raise ValueError(f"No se puede eliminar: tiene asistencias en el partido #{partido.id} que ya finalizó.")
+
+        if jugador.equipo:
+            jugador.equipo.quitar_jugador(jugador)
+        self.jugadores.remove(jugador)
+
+    def agregar_equipo(self, nombre, nombre_capitan, correo_capitan):
+        if not nombre or not nombre_capitan:
+            raise ValueError("El nombre del equipo y del capitán son obligatorios.")
+            
+        nuevo_id = max([e.id for e in self.equipos], default=0) + 1
+        equipo = Equipo(nuevo_id, nombre, nombre_capitan, correo_capitan)
+        self.equipos.append(equipo)
+        return equipo
+
+    def eliminar_equipo(self, equipo_id):
+        equipo = self.buscar_equipo(equipo_id)
+        if not equipo:
+            raise ValueError("Equipo no encontrado.")
+
+        # Regla: No borrar si tiene partidos asociados
+        for partido in self.partidos:
+            if equipo.id in (partido.equipo_local.id, partido.equipo_visitante.id):
+                raise ValueError(f"No se puede eliminar: el equipo tiene partidos (ej. Partido #{partido.id}).")
+
+        # Regla: Impedir borrado si aún tiene jugadores inscritos (más seguro)
+        if equipo.cantidad_jugadores() > 0:
+            raise ValueError("No se puede eliminar el equipo porque aún tiene jugadores en su plantilla. Elimínelos primero.")
+
+        self.equipos.remove(equipo)
+
+    def agregar_arbitro(self, nombres, correo="", telefono=""):
+        if not nombres:
+            raise ValueError("El nombre del árbitro es obligatorio.")
+            
+        nuevo_id = max([a.id for a in self.arbitros], default=0) + 1
+        arbitro = Arbitro(nuevo_id, nombres, correo, telefono)
+        self.arbitros.append(arbitro)
+        return arbitro
+
+    def eliminar_arbitro(self, arbitro_id):
+        arbitro = next((a for a in self.arbitros if a.id == arbitro_id), None)
+        if not arbitro:
+            raise ValueError("Árbitro no encontrado.")
+
+        # Regla: No borrar si está asignado a partidos
+        for partido in self.partidos:
+            if partido.arbitro and partido.arbitro.id == arbitro.id:
+                raise ValueError("No se puede eliminar: el árbitro está asignado a uno o más partidos.")
+
+        self.arbitros.remove(arbitro)
 # ══════════════════════════════════════════════════════════════════
 #  Construcción de los datos
 # ══════════════════════════════════════════════════════════════════
@@ -192,7 +275,8 @@ def _generar_eventos(partido, azar, minuto_desde, minuto_hasta):
                 companeros = [j for j in plantel if j.id != goleador.id]
                 asistente = azar.choice(companeros)
             partido.registrar_gol(
-                goleador, azar.randint(minuto_desde, minuto_hasta), asistente
+                goleador, azar.randint(minuto_desde, minuto_hasta), asistente,
+                validar_minuto=False,
             )
 
     for _ in range(azar.choice(TARJETAS_POR_TIEMPO)):

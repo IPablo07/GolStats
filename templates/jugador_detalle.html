@@ -29,10 +29,18 @@
             {% if tiene_huella %}Volver a registrar huella{% else %}Registrar huella{% endif %}
           </button>
         </form>
-        <p class="small text-body-secondary mt-2 mb-0">
+        <p class="small text-body-secondary mt-2 mb-3">
           Modo del lector: <strong>{{ modo_huella }}</strong>
           {% if modo_huella == 'secugen' %}— coloque el dedo cuando el botón lo pida.{% endif %}
         </p>
+        
+        <hr class="mb-3 mt-0">
+        
+        <form method="post" action="{{ url_for('cambiar_camiseta', jugador_id=jugador.id) }}" class="d-flex align-items-center gap-2">
+          <label for="numero_camiseta" class="form-label small fw-semibold mb-0 text-nowrap">Nuevo Dorsal:</label>
+          <input type="number" name="numero_camiseta" id="numero_camiseta" class="form-control form-control-sm" value="{{ jugador.numero_camiseta }}" min="1" max="99" required>
+          <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+        </form>
       </div>
       {% endif %}
     </div>

@@ -26,8 +26,12 @@ from modelos.pago import PagoVocalia
 
 class EventoPartido:
     """Clase base de todo lo que se registra durante un partido."""
+    
+    _contador_ids = 0  # Identificador para la edición
 
     def __init__(self, partido, jugador, minuto=None):
+        EventoPartido._contador_ids += 1
+        self.id = EventoPartido._contador_ids
         self.partido = partido
         self.jugador = jugador
         self.minuto = minuto
@@ -505,8 +509,14 @@ class Partido:
                 f"{jugador.nombre_completo()} no hizo check-in, no pudo jugar"
             )
 
-    def registrar_gol(self, jugador, minuto, jugador_asistencia=None):
+    def registrar_gol(self, jugador, minuto, jugador_asistencia=None, validar_minuto=True):
         """Regla 3: al registrar un gol se actualiza solo el marcador."""
+        # Los goles quedan bloqueados en el medio tiempo. No se toca
+        # esta_en_juego() porque también la usan las tarjetas y el
+        # encargo solo pide bloquear goles.
+        if self._estado == Partido.MEDIO_TIEMPO:
+            raise ValueError("No se pueden registrar goles durante el medio tiempo")
+
         self._validar_registro_en_juego(jugador)
         if jugador_asistencia is not None:
             self._validar_registro_en_juego(jugador_asistencia)
@@ -514,6 +524,20 @@ class Partido:
                 raise ValueError(
                     "La asistencia debe ser de un compañero del mismo equipo"
                 )
+
+        # El minuto no puede ir por delante del cronómetro. datos_prueba.py
+        # genera los 12 partidos del torneo llamando a iniciar_primer_tiempo()
+        # y registrando goles de forma instantánea: el reloj arranca, pero
+        # el partido entero se juega en microsegundos, así que
+        # minuto_actual() marcaría siempre 1 y rechazaría casi todos los
+        # goles simulados. Por eso el parámetro validar_minuto: la ruta real
+        # de la vocalía (app.py) lo deja en True; datos_prueba.py lo pasa en
+        # False porque ahí el minuto es simulado, no cronometrado de verdad.
+        if validar_minuto and self.reloj_corriendo() and minuto > self.minuto_actual():
+            raise ValueError(
+                f"El partido va por el minuto {self.minuto_actual()}: no se "
+                f"puede registrar un gol en el {minuto}"
+            )
 
         gol = Gol(self, jugador, minuto, jugador_asistencia)
         self._goles.append(gol)
@@ -523,6 +547,67 @@ class Partido:
             self.goles_visitante += 1
         return gol
 
+   
+    def editar_gol(self, gol_id, jugador, minuto, jugador_asistencia=None):
+        """Edita un gol existente y recalcula el marcador."""
+        if self.esta_cerrado():
+            raise ValueError("No se pueden editar eventos de un partido finalizado")
+
+        gol = next((g for g in self._goles if g.id == gol_id), None)
+        if not gol:
+            raise ValueError("El gol no existe")
+
+        self._validar_registro_en_juego(jugador)
+        
+        if jugador_asistencia is not None:
+            self._validar_registro_en_juego(jugador_asistencia)
+            if jugador_asistencia.equipo.id != jugador.equipo.id:
+                raise ValueError("La asistencia debe ser de un compañero del mismo equipo")
+            if jugador_asistencia.id == jugador.id:
+                raise ValueError("Un jugador no puede asistirse a sí mismo")
+
+        if self.reloj_corriendo() and minuto > self.minuto_actual():
+            raise ValueError(f"El partido va por el minuto {self.minuto_actual()}: no se puede poner el {minuto}")
+
+        # Recalcular el marcador (restar el anterior, sumar el nuevo)
+        if self.es_local(gol.equipo):
+            self.goles_local -= 1
+        else:
+            self.goles_visitante -= 1
+
+        gol.jugador = jugador
+        gol.minuto = minuto
+        gol.jugador_asistencia = jugador_asistencia
+        gol.equipo = jugador.equipo
+
+        if self.es_local(gol.equipo):
+            self.goles_local += 1
+        else:
+            self.goles_visitante += 1
+
+        return gol
+
+    def editar_tarjeta(self, tarjeta_id, jugador, tipo, minuto):
+        """Edita una tarjeta existente."""
+        if self.esta_cerrado():
+            raise ValueError("No se pueden editar eventos de un partido finalizado")
+
+        tarjeta = next((t for t in self._tarjetas if t.id == tarjeta_id), None)
+        if not tarjeta:
+            raise ValueError("La tarjeta no existe")
+
+        if tipo not in Tarjeta.TIPOS:
+            raise ValueError(f"Tipo de tarjeta inválido: {tipo}")
+
+        self._validar_registro_en_juego(jugador)
+
+        tarjeta.jugador = jugador
+        tarjeta.tipo = tipo
+        tarjeta.minuto = minuto
+        tarjeta.equipo = jugador.equipo
+
+        return tarjeta
+    
     def registrar_tarjeta(self, jugador, tipo, minuto):
         """
         Carga una tarjeta que el árbitro anotó en papel.

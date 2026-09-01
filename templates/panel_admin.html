@@ -38,6 +38,32 @@
   </div>
 </div>
 
+{# ── ACCESOS RÁPIDOS (NUEVO) ────────────────────────────────────── #}
+<div class="row g-4 mb-4">
+  <div class="col-12 col-md-6">
+    <div class="card h-100 shadow-sm border-0 bg-primary bg-opacity-10">
+      <div class="card-body d-flex align-items-center justify-content-between">
+        <div>
+          <h5 class="fw-bold text-primary mb-1">Gestión del Torneo</h5>
+          <p class="small text-body-secondary mb-0">Alta y baja de equipos, jugadores y árbitros.</p>
+        </div>
+        <a href="{{ url_for('gestion_panel') }}" class="btn btn-primary shadow-sm">Administrar</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="card h-100 shadow-sm border-0 bg-success bg-opacity-10">
+      <div class="card-body d-flex align-items-center justify-content-between">
+        <div>
+          <h5 class="fw-bold text-success mb-1">Biometría y Huellas</h5>
+          <p class="small text-body-secondary mb-0">Enrolamiento de jugadores y administradores.</p>
+        </div>
+        <a href="{{ url_for('biometria_panel') }}" class="btn btn-success shadow-sm">Enrolar</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row g-4">
   <div class="col-12 col-lg-7">
     <div class="card h-100">

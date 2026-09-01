@@ -39,6 +39,14 @@ class Equipo:
         self._jugadores.append(jugador)
         jugador.equipo = self
         return jugador
+    
+    def quitar_jugador(self, jugador):
+        """
+        Saca a un jugador de la plantilla del equipo.
+        """
+        if self.tiene_jugador(jugador):
+            self._jugadores.remove(jugador)
+            jugador.equipo = None
 
     def obtener_jugadores(self):
         """
@@ -48,6 +56,24 @@ class Equipo:
         modificando el equipo por accidente.
         """
         return list(self._jugadores)
+    
+    def cambiar_numero(self, jugador, numero_nuevo):
+        """
+        Cambia el dorsal del jugador validando que no esté ocupado por otro.
+        """
+        if not self.tiene_jugador(jugador):
+            raise ValueError(f"El jugador no pertenece al equipo {self.nombre}.")
+        
+        numero_nuevo = int(numero_nuevo)
+        if numero_nuevo < 1 or numero_nuevo > 99:
+            raise ValueError("El número de camiseta debe estar entre 1 y 99.")
+            
+        # Validar si el número está ocupado por OTRO jugador
+        for j in self._jugadores:
+            if j.numero_camiseta == numero_nuevo and j.id != jugador.id:
+                raise ValueError(f"El número {numero_nuevo} ya está ocupado por otro jugador en el equipo.")
+                
+        jugador.numero_camiseta = numero_nuevo
 
     def cantidad_jugadores(self):
         return len(self._jugadores)

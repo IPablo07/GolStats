@@ -56,11 +56,7 @@
   {% if es_admin and not partido.esta_cerrado() %}
   <div class="card-footer bg-white">
 
-    {# ── Cronómetro del partido ───────────────────────────────────
-       Reloj de partido real, pero manejado por el admin: arranca con
-       "Iniciar primer tiempo", se pausa en el medio tiempo y se reanuda
-       con el segundo tiempo, hasta los 90'. El tiempo lo lleva el
-       servidor (Partido.cronometro()); acá solo se muestra. #}
+    {# ── Cronómetro del partido ─────────────────────────────────── #}
     {% set crono = partido.cronometro() %}
     <div class="d-flex flex-wrap align-items-center justify-content-center gap-4 mb-3"
          id="cronometro"
@@ -114,7 +110,6 @@
       </button>
     </form>
 
-    {# Punto 7: ya no se envía directo, primero pide confirmación #}
     <form method="post" id="form-finalizar" action="{{ url_for('cambiar_estado', partido_id=partido.id) }}">
       <input type="hidden" name="accion" value="finalizar">
     </form>
@@ -154,7 +149,6 @@
           </div>
           {% if es_admin and not pago.esta_pagado() and not partido.esta_cerrado() %}
           <div class="d-flex gap-2 mt-2">
-            {# Punto 7: confirmación antes de registrar el pago #}
             <form method="post" id="form-pago-{{ pago.equipo.id }}"
                   action="{{ url_for('registrar_pago', partido_id=partido.id) }}">
               <input type="hidden" name="equipo_id" value="{{ pago.equipo.id }}">
@@ -165,7 +159,6 @@
                     data-equipo="{{ pago.equipo.nombre }}">
               Registrar pago
             </button>
-
           </div>
           {% endif %}
         </li>
@@ -234,7 +227,11 @@
     <div class="card h-100">
       <div class="card-header bg-white fw-semibold">Registrar gol</div>
       <div class="card-body">
-        {# Punto 6: validación en el cliente #}
+        {% if partido.estado == 'medio_tiempo' %}
+        <div class="alert alert-warning text-center small mb-0">
+          No se pueden registrar goles durante el medio tiempo.
+        </div>
+        {% else %}
         <form method="post" action="{{ url_for('registrar_gol', partido_id=partido.id) }}"
               class="row g-2 needs-validation" novalidate>
           <div class="col-12">
@@ -270,13 +267,14 @@
           </div>
           <div class="col-6">
             <label class="form-label small">Minuto</label>
-            <input type="number" name="minuto" class="form-control" min="1" max="120" required>
-            <div class="invalid-feedback">Ingresa un minuto entre 1 y 120.</div>
+            <input type="number" name="minuto" class="form-control" value="{{ partido.minuto_actual() }}" min="1" max="{{ partido.minuto_actual() }}" required>
+            <div class="invalid-feedback">Ingresa un minuto válido.</div>
           </div>
           <div class="col-6 d-flex align-items-end">
             <button class="btn btn-success w-100">Registrar gol</button>
           </div>
         </form>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -285,7 +283,6 @@
     <div class="card h-100">
       <div class="card-header bg-white fw-semibold">Registrar tarjeta</div>
       <div class="card-body">
-        {# Punto 6: validación en el cliente #}
         <form method="post" action="{{ url_for('registrar_tarjeta', partido_id=partido.id) }}"
               class="row g-2 needs-validation" novalidate>
           <div class="col-12">
@@ -313,8 +310,8 @@
           </div>
           <div class="col-6">
             <label class="form-label small">Minuto</label>
-            <input type="number" name="minuto" class="form-control" min="1" max="120" required>
-            <div class="invalid-feedback">Ingresa un minuto entre 1 y 120.</div>
+            <input type="number" name="minuto" class="form-control" value="{{ partido.minuto_actual() }}" min="1" max="{{ partido.minuto_actual() }}" required>
+            <div class="invalid-feedback">Ingresa un minuto válido.</div>
           </div>
           <div class="col-12">
             <button class="btn btn-warning w-100">Registrar tarjeta</button>
@@ -325,7 +322,7 @@
   </div>
   {% endif %}
 
-  {# ── Línea de tiempo ──────────────────────────────────────── #}
+  {# ── Línea de tiempo (CON BOTONES DE EDICIÓN DEL BLOQUE 5) ── #}
   <div class="col-12">
     <div class="card">
       <div class="card-header bg-white fw-semibold">Eventos del partido</div>
@@ -340,6 +337,22 @@
             {{ evento.descripcion() }}
           </span>
           <span class="ms-auto small text-body-secondary">{{ evento.equipo.nombre }}</span>
+          
+          {% if es_admin and not partido.esta_cerrado() %}
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-editar-evento ms-2"
+                  data-bs-toggle="modal" 
+                  data-bs-target="#modal-editar-{{ evento.__class__.__name__|lower }}"
+                  data-url="{{ url_for('editar_' ~ evento.__class__.__name__|lower, partido_id=partido.id, evento_id=evento.id) }}"
+                  data-jugador="{{ evento.jugador.id }}"
+                  data-minuto="{{ evento.minuto }}"
+                  {% if evento.__class__.__name__ == 'Gol' %}
+                  data-asistencia="{{ evento.jugador_asistencia.id if evento.jugador_asistencia else '' }}"
+                  {% elif evento.__class__.__name__ == 'Tarjeta' %}
+                  data-tipo="{{ evento.tipo }}"
+                  {% endif %}>
+            ✏️
+          </button>
+          {% endif %}
         </li>
         {% else %}
         <li class="list-group-item">
@@ -355,7 +368,7 @@
 
 </div>
 
-{# ── Modal con el carnet que aparece al confirmar el check-in ─ #}
+{# ── Modales Existentes ───────────────────────────────────────── #}
 <div class="modal fade" id="modal-carnet" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -380,7 +393,6 @@
   </div>
 </div>
 
-{# ── Punto 7: modal de confirmación para finalizar partido ───── #}
 <div class="modal fade" id="modal-confirmar-finalizar" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -402,7 +414,6 @@
   </div>
 </div>
 
-{# ── Punto 7: modal de confirmación para registrar pago ──────── #}
 <div class="modal fade" id="modal-confirmar-pago" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -424,10 +435,100 @@
     </div>
   </div>
 </div>
+
+{# ── Modales de Edición (BLOQUE 5) ──────────────────────────────── #}
+{% if es_admin %}
+<div class="modal fade" id="modal-editar-gol" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="form-editar-gol">
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Gol</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-2">
+          <div class="col-12">
+            <label class="form-label small">Jugador</label>
+            <select name="jugador_id" id="edit-gol-jugador" class="form-select" required>
+              {% for equipo in partido.equipos() %}
+              <optgroup label="{{ equipo.nombre }}">
+                {% for jugador in partido.obtener_convocados(equipo) %}
+                <option value="{{ jugador.id }}">#{{ jugador.numero_camiseta }} {{ jugador.nombre_completo() }}</option>
+                {% endfor %}
+              </optgroup>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small">Asistencia</label>
+            <select name="asistencia_id" id="edit-gol-asistencia" class="form-select">
+              <option value="">Sin asistencia</option>
+              {% for equipo in partido.equipos() %}
+              <optgroup label="{{ equipo.nombre }}">
+                {% for jugador in partido.obtener_convocados(equipo) %}
+                <option value="{{ jugador.id }}">#{{ jugador.numero_camiseta }} {{ jugador.nombre_completo() }}</option>
+                {% endfor %}
+              </optgroup>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label small">Minuto</label>
+            <input type="number" name="minuto" id="edit-gol-minuto" class="form-control" min="1" max="{{ partido.minuto_actual() }}" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modal-editar-tarjeta" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="form-editar-tarjeta">
+        <div class="modal-header">
+          <h5 class="modal-title">Editar Tarjeta</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body row g-2">
+          <div class="col-12">
+            <label class="form-label small">Jugador</label>
+            <select name="jugador_id" id="edit-tarjeta-jugador" class="form-select" required>
+              {% for equipo in partido.equipos() %}
+              <optgroup label="{{ equipo.nombre }}">
+                {% for jugador in partido.obtener_convocados(equipo) %}
+                <option value="{{ jugador.id }}">#{{ jugador.numero_camiseta }} {{ jugador.nombre_completo() }}</option>
+                {% endfor %}
+              </optgroup>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Tipo</label>
+            <select name="tipo" id="edit-tarjeta-tipo" class="form-select" required>
+              <option value="amarilla">Amarilla</option>
+              <option value="roja">Roja</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Minuto</label>
+            <input type="number" name="minuto" id="edit-tarjeta-minuto" class="form-control" min="1" max="{{ partido.minuto_actual() }}" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
-{# Punto 6: activa la validación de Bootstrap en todos los formularios de esta pantalla #}
 <script>
   (function () {
     'use strict';
@@ -443,7 +544,6 @@
   })();
 </script>
 
-{# Punto 7: conecta los modales de confirmación con sus formularios reales #}
 <script>
   (function () {
     'use strict';
@@ -476,11 +576,6 @@
 
 {% if usuario.rol == 'admin' and not partido.esta_cerrado() %}
 <script>
-  {# El reloj lo lleva el servidor. Acá se hace las dos cosas a la vez:
-     se avanza un segundo localmente para que el número se mueva solo, y
-     cada 10 segundos se vuelve a preguntar al servidor para corregir
-     cualquier desfase (recargas, pestañas abiertas hace rato, otra
-     máquina mirando la misma vocalía). #}
   (function () {
     'use strict';
 
@@ -508,8 +603,6 @@
     let fase = {{ partido.fase_reloj()|tojson }};
     let estado = {{ partido.estado|tojson }};
 
-    // Mismo criterio que Partido.minuto_actual(): corriendo se muestra el
-    // minuto en curso, en pausa el último cumplido, y nunca más del tope.
     function minutoDe(seg) {
       let minuto;
       if (!corriendo) {
@@ -556,7 +649,6 @@
         estado = datos.estado;
         pintar();
       } catch (error) {
-        // Sin red no pasa nada: el reloj local sigue corriendo solo.
       }
     }
 
@@ -570,14 +662,31 @@
     setInterval(resincronizar, 10000);
   })();
 </script>
+
+{# ── Script de Edición (BLOQUE 5) ─────────────────────────── #}
+<script>
+  document.querySelectorAll('.btn-editar-evento').forEach(boton => {
+    boton.addEventListener('click', function() {
+      const targetModal = this.dataset.bsTarget;
+      
+      if (targetModal === '#modal-editar-gol') {
+        document.getElementById('form-editar-gol').action = this.dataset.url;
+        document.getElementById('edit-gol-jugador').value = this.dataset.jugador;
+        document.getElementById('edit-gol-asistencia').value = this.dataset.asistencia;
+        document.getElementById('edit-gol-minuto').value = this.dataset.minuto;
+      } else if (targetModal === '#modal-editar-tarjeta') {
+        document.getElementById('form-editar-tarjeta').action = this.dataset.url;
+        document.getElementById('edit-tarjeta-jugador').value = this.dataset.jugador;
+        document.getElementById('edit-tarjeta-tipo').value = this.dataset.tipo;
+        document.getElementById('edit-tarjeta-minuto').value = this.dataset.minuto;
+      }
+    });
+  });
+</script>
 {% endif %}
 
 {% if usuario.rol == 'admin' and partido.estado == 'programado' %}
 <script>
-  {# La captura y el match ya los hace Flask del lado del servidor
-     (servicios/huella.py): el navegador solo pide el check-in y espera
-     la respuesta. Con el lector real la petición tarda unos segundos,
-     porque el servidor está esperando a que se apoye el dedo. #}
   const urlCheckin = "{{ url_for('checkin', partido_id=partido.id) }}";
   const modalCarnet = new bootstrap.Modal(document.getElementById("modal-carnet"));
 
