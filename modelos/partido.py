@@ -6,9 +6,9 @@ El corazón del sistema: el partido y todo lo que pasa dentro de él
 walkover y cierre).
 
 Las mismas reglas que aquí se validan en Python están replicadas como
-triggers en PostgreSQL (ver sql/schema.sql). Por ahora todo vive en
-memoria; cuando se conecte la base de datos, la interfaz pública de
-esta clase no cambia.
+triggers en PostgreSQL (ver database/02_triggers.sql). Por ahora todo
+vive en memoria; cuando se conecte la base de datos, la interfaz pública
+de esta clase no cambia.
 
 Jerarquía de eventos: EventoPartido (base) → Gol, Tarjeta, CheckIn.
 Cada uno define su propio descripcion() — polimorfismo.
